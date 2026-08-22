@@ -1,0 +1,39 @@
+name: wiki2
+
+data:
+  dir: data/raw/wiki2
+  h: 7
+  input_size: 28
+  split: {strategy: last_h}
+  # Depth of the underscore-joined column names; see docs/datasets.md.
+  levels:
+    Total: [0, 1]
+    Language: [1, 7]
+    Language/Access: [7, 25]
+    Language/Access/Agent: [25, 49]
+    Article: [49, 199]
+
+features:
+  static:
+    - {type: grouped_static_dummies, keys: [country, access, agent],
+       sep: "_", positions: [0, 1, 2]}
+  future:
+    - {type: dayofweek_dummies}
+    - {type: seasonal_naive_anchor, lags: [7]}
+
+model:
+  temp_conv_channels: 10
+  dilations: [1, 2]
+  cross_series_hidden: 200
+  static_encoder_dim: 5
+  future_encoder_dim: 20
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 20
+  n_factors: 20
+
+train:
+  learning_rate: 5.0e-4
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 500

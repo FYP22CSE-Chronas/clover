@@ -1,0 +1,42 @@
+name: tourism_large
+
+data:
+  dir: data/raw/tourism_large
+  h: 12
+  input_size: 36
+  split: {strategy: last_h}
+  # Grouped hierarchy: four geography-only blocks, then the same four crossed
+  # with purpose of travel.
+  levels:
+    Country: [0, 1]
+    State: [1, 8]
+    Zone: [8, 35]
+    Region: [35, 111]
+    Country/Purpose: [111, 115]
+    State/Purpose: [115, 143]
+    Zone/Purpose: [143, 251]
+    Region/Purpose: [251, 555]
+
+features:
+  static:
+    - {type: tourism_large_static_dummies}
+  future:
+    - {type: month_dummies}
+    - {type: seasonal_naive_anchor, lags: [12]}
+
+model:
+  temp_conv_channels: 30
+  dilations: [1, 2, 3, 6, 12]
+  cross_series_hidden: 50
+  static_encoder_dim: 20
+  future_encoder_dim: 50
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 20
+  n_factors: 10
+
+train:
+  learning_rate: 5.0e-4
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 300

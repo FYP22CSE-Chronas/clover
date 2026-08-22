@@ -1,0 +1,38 @@
+name: prison
+
+data:
+  dir: data/raw/prison
+  h: 8
+  input_size: 8
+  split: {strategy: last_h}
+  levels:
+    Total: [0, 1]
+    State: [1, 9]
+    Gender: [9, 11]
+    Legal: [11, 13]
+    State/Gender/Legal: [13, 45]
+
+features:
+  static:
+    - {type: grouped_static_dummies, keys: [state, gender, legal],
+       sep: "-", positions: [0, 1, 2]}
+  future:
+    - {type: quarter_dummies}
+    - {type: seasonal_naive_anchor, lags: [8, 12]}
+
+model:
+  temp_conv_channels: 10
+  dilations: [1, 2, 4]
+  cross_series_hidden: 100
+  static_encoder_dim: 10
+  future_encoder_dim: 4
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 10
+
+train:
+  learning_rate: 5.0e-4
+  max_steps: 1000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 500

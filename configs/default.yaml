@@ -1,0 +1,32 @@
+data:
+  split: {strategy: last_h}
+
+model:
+  encoder: dilated_conv
+  mixer: cross_series_mlp
+  decoder: two_stage
+  head: factor_model
+  kernel_size: 2
+  conv_residual: true
+  sigma_activation: softplus
+  sigma_eps: 1.0e-3
+
+train:
+  batch_size: 1
+  num_lr_decays: 4
+  lr_decay_gamma: 0.5
+  weight_decay: 0.0
+  scaler: standard
+  objective: crps
+  loss_weighting: none
+  normalize_loss: true
+  train_mc_samples: 50
+  val_mc_samples: 500
+  val_check_steps: 100
+  checkpoint_every: 100
+  restore_best: true
+
+eval:
+  num_samples: 1000
+  estimator: quantile
+  quantile_step: 0.01

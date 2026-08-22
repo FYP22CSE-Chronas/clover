@@ -1,0 +1,39 @@
+# Run from the repository root; this project is not installed as a library.
+#   pip install -r requirements.txt
+#   python -m cli --dataset tourism_small --seeds 0
+
+[project]
+name = "clover"
+version = "1.0.0"
+description = "Coherent probabilistic forecasting for hierarchical time series"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.0", "numpy>=1.24", "pandas>=2.0", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.5"]
+favorita = ["pyarrow>=14.0"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ARG"]
+ignore = [
+    "ARG001",  # registered factories share one keyword signature by design
+    "ARG002",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "contracts", "data", "model", "pipeline", "registry", "training"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]

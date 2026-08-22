@@ -1,0 +1,36 @@
+name: tourism_small
+
+data:
+  dir: data/raw/tourism_small
+  h: 4
+  input_size: 8
+  split: {strategy: last_h}
+  levels:
+    Country: [0, 1]
+    Country/Purpose: [1, 5]
+    Country/Purpose/State: [5, 33]
+    Country/Purpose/State/CityNonCity: [33, 89]
+
+features:
+  static:
+    - {type: grouped_static_dummies, keys: [state], sep: "-", positions: [0]}
+  future:
+    - {type: quarter_dummies}
+    - {type: seasonal_naive_anchor, lags: [4, 8]}
+
+model:
+  temp_conv_channels: 10
+  dilations: [1, 2, 4]
+  cross_series_hidden: 100
+  static_encoder_dim: 10
+  future_encoder_dim: 4
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 10
+
+train:
+  learning_rate: 5.0e-4
+  max_steps: 1000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 500

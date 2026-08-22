@@ -1,0 +1,39 @@
+name: police
+
+data:
+  dir: data/raw/police
+  h: 30
+  input_size: 56
+  split: {strategy: last_h}
+  levels:
+    Total: [0, 1]
+    Crime: [1, 20]
+    Beat: [20, 99]
+    Street: [99, 109]
+    ZIP: [109, 176]
+    Crime/Beat/Street/ZIP: [176, 676]
+
+features:
+  static:
+    - {type: grouped_static_dummies, keys: [crime, beat, street, zip],
+       sep: "-", positions: [0, 1, 2, 3]}
+  future:
+    - {type: dayofweek_dummies}
+    - {type: seasonal_naive_anchor, lags: [35]}
+
+model:
+  temp_conv_channels: 10
+  dilations: [1, 7, 14, 28]
+  cross_series_hidden: 200
+  static_encoder_dim: 5
+  future_encoder_dim: 20
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 20
+  n_factors: 20
+
+train:
+  learning_rate: 5.0e-4
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 200

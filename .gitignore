@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+results/
+checkpoints/
+*.pt
+
+# Datasets: the CSV pairs are small enough to track; the Favorita bulk is not.
+data/favorita/train.csv
+data/favorita/panel/

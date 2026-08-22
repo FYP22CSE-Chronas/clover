@@ -1,0 +1,11 @@
+torch>=2.0
+numpy>=1.24
+pandas>=2.0
+pyyaml>=6.0
+
+# tests and linting
+pytest>=7.4
+ruff>=0.5
+
+# only needed to rebuild the Favorita panel from raw CSVs
+pyarrow>=14.0
