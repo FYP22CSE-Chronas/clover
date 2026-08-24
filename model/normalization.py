@@ -5,7 +5,7 @@ from typing import Protocol
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, ScaleStats
+from contracts import FactorParams, ScaleStats, SkewTParams
 from registry import Registry
 
 EPS = 1e-6
@@ -85,11 +85,22 @@ def denormalize(x: Tensor, stats: ScaleStats) -> Tensor:
     return x * stats.scale + stats.loc
 
 
-def denormalize_params(params: FactorParams, stats: ScaleStats) -> FactorParams:
+def denormalize_params(
+    params: FactorParams | SkewTParams, stats: ScaleStats
+) -> FactorParams | SkewTParams:
     """Push (loc, scale) back onto mu/sigma/F so samples land in raw units.
 
-    The factor model is affine, so this inverse is exact.
+    Both factor models are affine in mu/sigma/F, so this inverse is exact. A
+    skew-t's `nu`/`lam` are scale-free shape parameters and pass through unchanged.
     """
+    if isinstance(params, SkewTParams):
+        return SkewTParams(
+            mu=params.mu * stats.scale + stats.loc,
+            sigma=params.sigma * stats.scale,
+            nu=params.nu,
+            lam=params.lam,
+            F=params.F * stats.scale.unsqueeze(-1),
+        )
     return FactorParams(
         mu=params.mu * stats.scale + stats.loc,
         sigma=params.sigma * stats.scale,
