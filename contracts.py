@@ -27,6 +27,22 @@ class FactorParams:
 
 
 @dataclass(frozen=True)
+class SkewTParams:
+    """Skew-t factor-model parameters at the bottom level.
+
+    Adds two scale-free shape parameters to the same mu/sigma/F factor structure
+    as `FactorParams`: `nu` (degrees of freedom, > 2 for finite variance) controls
+    tail heaviness and `lam` controls skewness (0 recovers a symmetric Student-t).
+    """
+
+    mu: Tensor  # [B, H, Nb]
+    sigma: Tensor  # [B, H, Nb]
+    nu: Tensor  # [B, H, Nb]
+    lam: Tensor  # [B, H, Nb]
+    F: Tensor  # [B, H, Nb, K]
+
+
+@dataclass(frozen=True)
 class ScaleStats:
     """Per-window, per-series location and scale, broadcastable over time."""
 
@@ -84,6 +100,6 @@ class Decoder(Protocol):
 
 
 class Head(Protocol):
-    """[B, Nb, H, D'] -> FactorParams."""
+    """[B, Nb, H, D'] -> FactorParams or SkewTParams."""
 
-    def __call__(self, z: Tensor) -> FactorParams: ...
+    def __call__(self, z: Tensor) -> FactorParams | SkewTParams: ...

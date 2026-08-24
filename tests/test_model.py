@@ -97,3 +97,70 @@ def test_gradients_reach_every_parameter(model: CLOVER) -> None:
     (params.mu.sum() + params.sigma.sum() + params.F.sum()).backward()
     missing = [n for n, p in model.named_parameters() if p.grad is None]
     assert not missing, f"no gradient reached {missing}"
+
+
+def test_skew_t_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.nu.shape == (B, H, model.n_bottom)
+    assert params.lam.shape == (B, H, model.n_bottom)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.nu > 2).all()
+
+
+def test_skew_t_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    total = params.mu.sum() + params.sigma.sum() + params.nu.sum() + params.lam.sum()
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"
+
+
+def test_skew_t_shared_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t_shared"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.nu.shape == (B, H, model.n_bottom)
+    assert params.lam.shape == (B, H, model.n_bottom)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.nu > 2).all()
+
+
+def test_skew_t_shared_head_nu_and_lam_are_global() -> None:
+    """A single (nu, lam) pair broadcasts across every series and horizon."""
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t_shared"),
+        dims,
+        np.eye(4, dtype=np.float32),
+    )
+    params = model(_batch(model.n_bottom))
+    assert params.nu.unique().numel() == 1
+    assert params.lam.unique().numel() == 1
+
+
+def test_skew_t_shared_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t_shared"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    total = params.mu.sum() + params.sigma.sum() + params.nu.sum() + params.lam.sum()
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"

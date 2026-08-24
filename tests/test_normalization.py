@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from contracts import FactorParams
+from contracts import FactorParams, SkewTParams
 from model.normalization import (
     SCALERS,
     denormalize,
@@ -74,6 +74,25 @@ def test_denormalize_params_is_exact() -> None:
     torch.testing.assert_close(
         draw(raw), draw(params) * scale + loc, atol=1e-4, rtol=1e-4
     )
+
+
+def test_denormalize_skew_t_params_scales_shape_free_terms() -> None:
+    """mu/sigma/F scale affinely; nu/lam are scale-free and must pass through."""
+    torch.manual_seed(0)
+    stats = window_stats(torch.rand(1, L, N) * 20 + 5, "standard")
+    params = SkewTParams(
+        mu=torch.randn(1, 4, N),
+        sigma=torch.rand(1, 4, N) + 0.1,
+        nu=torch.rand(1, 4, N) * 20 + 5,
+        lam=torch.randn(1, 4, N),
+        F=torch.randn(1, 4, N, 2),
+    )
+    raw = denormalize_params(params, stats)
+    torch.testing.assert_close(raw.mu, params.mu * stats.scale + stats.loc)
+    torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
+    torch.testing.assert_close(raw.nu, params.nu)
+    torch.testing.assert_close(raw.lam, params.lam)
+    torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
 
 
 def test_unknown_scaler_lists_alternatives() -> None:

@@ -4,12 +4,13 @@ import numpy as np
 import pytest
 import torch
 
-from contracts import FactorParams
+from contracts import FactorParams, SkewTParams
 from model.distribution import (
     aggregate_targets,
     coherent_aggregate,
     sample_coherent,
     sample_factor_model,
+    sample_skew_t_factor_model,
 )
 
 B, H, K = 2, 3, 4
@@ -19,6 +20,21 @@ def _params(n_bottom: int) -> FactorParams:
     return FactorParams(
         mu=torch.randn(B, H, n_bottom),
         sigma=torch.rand(B, H, n_bottom) + 0.1,
+        F=torch.randn(B, H, n_bottom, K) * 0.1,
+    )
+
+
+def _skew_t_params(n_bottom: int, lam: float | None = None) -> SkewTParams:
+    lam_t = (
+        torch.full((B, H, n_bottom), lam)
+        if lam is not None
+        else torch.randn(B, H, n_bottom)
+    )
+    return SkewTParams(
+        mu=torch.randn(B, H, n_bottom),
+        sigma=torch.rand(B, H, n_bottom) + 0.1,
+        nu=torch.rand(B, H, n_bottom) * 20 + 5,
+        lam=lam_t,
         F=torch.randn(B, H, n_bottom, K) * 0.1,
     )
 
@@ -77,3 +93,65 @@ def test_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
     a = sample_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
     b = sample_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
     torch.testing.assert_close(a, b)
+
+
+def test_skew_t_sample_shape(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    samples = sample_skew_t_factor_model(_skew_t_params(n_bottom), num_samples=16)
+    assert samples.shape == (B, H, n_bottom, 16)
+
+
+def test_skew_t_samples_are_coherent(S: np.ndarray) -> None:
+    S_t = torch.as_tensor(S)
+    draws = sample_coherent(_skew_t_params(S.shape[1]), S_t, num_samples=32)
+    expected = torch.einsum("ij,bhjn->bhin", S_t, torch.relu(draws.bottom))
+    torch.testing.assert_close(draws.hierarchy, expected)
+
+
+def test_skew_t_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
+    params = _skew_t_params(S.shape[1])
+    a = sample_skew_t_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    b = sample_skew_t_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    torch.testing.assert_close(a, b)
+
+
+def test_skew_t_rejects_mismatched_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _skew_t_params(n_bottom)
+    bad = SkewTParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        nu=params.nu[..., :-1],
+        lam=params.lam,
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="must all match"):
+        sample_skew_t_factor_model(bad, num_samples=4)
+
+
+def test_skew_t_zero_lambda_is_symmetric() -> None:
+    """lam=0 collapses the skew-normal mixture to a symmetric Student-t innovation."""
+    torch.manual_seed(0)
+    params = SkewTParams(
+        mu=torch.zeros(1, 1, 1),
+        sigma=torch.ones(1, 1, 1),
+        nu=torch.full((1, 1, 1), 30.0),
+        lam=torch.zeros(1, 1, 1),
+        F=torch.zeros(1, 1, 1, 1),
+    )
+    samples = sample_skew_t_factor_model(params, num_samples=200_000)
+    torch.testing.assert_close(samples.mean(-1), params.mu, atol=0.02, rtol=0)
+
+
+def test_skew_t_positive_lambda_skews_right() -> None:
+    torch.manual_seed(0)
+    n_bottom = 1
+    params = SkewTParams(
+        mu=torch.zeros(1, 1, n_bottom),
+        sigma=torch.ones(1, 1, n_bottom),
+        nu=torch.full((1, 1, n_bottom), 10.0),
+        lam=torch.full((1, 1, n_bottom), 5.0),
+        F=torch.zeros(1, 1, n_bottom, 1),
+    )
+    samples = sample_skew_t_factor_model(params, num_samples=200_000)
+    assert samples.mean().item() > 0.0

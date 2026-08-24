@@ -71,3 +71,13 @@ def test_runs_are_reproducible_under_a_seed() -> None:
     a = run(quick("tourism_small"), seed=1, verbose=False)
     b = run(quick("tourism_small"), seed=1, verbose=False)
     assert a.scrps == pytest.approx(b.scrps)
+
+
+def test_skew_t_head_end_to_end_run_produces_finite_scores() -> None:
+    """The skew-t distribution head trains through the same pipeline as the default."""
+    config = quick("tourism_small")
+    config = replace(config, model=replace(config.model, head="skew_t"))
+    result = run(config, seed=0, verbose=False)
+    assert set(result.scrps) >= {"Overall"}
+    assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
+    assert result.history.steps_run == QUICK["max_steps"]
