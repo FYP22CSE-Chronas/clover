@@ -164,3 +164,33 @@ def test_skew_t_shared_head_gradients_reach_every_parameter(S: np.ndarray) -> No
     (total + params.F.sum()).backward()
     missing = [n for n, p in model.named_parameters() if p.grad is None]
     assert not missing, f"no gradient reached {missing}"
+
+
+def test_gmm_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="gmm"), dims, S)
+    params = model(_batch(model.n_bottom))
+    k = model.head.n_components
+    assert k == 2
+    assert params.mu.shape == (B, H, model.n_bottom, k)
+    assert params.sigma.shape == (B, H, model.n_bottom, k)
+    assert params.logits.shape == (B, H, model.n_bottom, k)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+
+
+def test_gmm_head_rejects_fewer_than_two_components() -> None:
+    with pytest.raises(ValueError, match="n_components must be >= 2"):
+        from model.heads import GMMHead
+
+        GMMHead(in_dim=4, n_factors=2, n_components=1)
+
+
+def test_gmm_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="gmm"), dims, S)
+    params = model(_batch(model.n_bottom))
+    total = params.mu.sum() + params.sigma.sum() + params.logits.sum()
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"

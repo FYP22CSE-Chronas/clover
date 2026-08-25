@@ -5,6 +5,7 @@ from model.distribution import (
     coherent_aggregate,
     sample_coherent,
     sample_factor_model,
+    sample_gmm_factor_model,
     sample_skew_t_factor_model,
 )
 from model.encoders import ENCODERS
@@ -35,6 +36,7 @@ __all__ = [
     "normalize",
     "sample_coherent",
     "sample_factor_model",
+    "sample_gmm_factor_model",
     "sample_skew_t_factor_model",
     "window_stats",
 ]

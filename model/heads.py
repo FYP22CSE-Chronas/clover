@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from contracts import FactorParams, SkewTParams
+from contracts import FactorParams, GMMParams, SkewTParams
 from model.blocks import MLPBlock
 from registry import Registry
 
@@ -88,6 +88,52 @@ class SkewTHead(nn.Module):
     def _nu(self, nu_raw: Tensor) -> Tensor:
         """Floor the degrees of freedom above `nu_floor` so variance stays finite."""
         return F.softplus(nu_raw) + self.nu_floor
+
+
+@HEADS.register("gmm")
+class GMMHead(nn.Module):
+    """Emits 3K + K_factors values per (series, horizon): K means, K raw scales,
+    K mixture logits, and K_factors loadings.
+
+    `n_components` defaults to 2: more components let each series' predictive
+    distribution be multimodal, but every component's mu/sigma/logit is fit
+    per (series, horizon), so more components need more training windows to
+    estimate reliably -- the same flexibility/data tradeoff seen with
+    `SkewTHead` vs `SkewTSharedHead`.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_components: int = 2,
+    ) -> None:
+        super().__init__()
+        if n_components < 2:
+            raise ValueError(f"n_components must be >= 2, got {n_components}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_components = n_components
+        self.proj = MLPBlock(in_dim, 3 * n_components + n_factors)
+
+    def forward(self, z: Tensor) -> GMMParams:
+        """[B, Nb, H, D] -> mu/sigma/logits [B, H, Nb, K] and loadings [B, H, Nb, Kf]."""
+        k = self.n_components
+        params = self.proj(z)
+        mu = params[..., :k].permute(0, 2, 1, 3)
+        sigma_raw = params[..., k : 2 * k].permute(0, 2, 1, 3)
+        logits = params[..., 2 * k : 3 * k].permute(0, 2, 1, 3)
+        loadings = params[..., 3 * k :].permute(0, 2, 1, 3)
+        return GMMParams(mu=mu, sigma=self._sigma(sigma_raw), logits=logits, F=loadings)
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
 
 
 @HEADS.register("skew_t_shared")

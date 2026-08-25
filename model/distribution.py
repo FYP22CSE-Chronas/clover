@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, ForecastSamples, SkewTParams
+from contracts import FactorParams, ForecastSamples, GMMParams, SkewTParams
 
 
 def sample_factor_model(
@@ -71,6 +71,54 @@ def sample_skew_t_factor_model(
     return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * t + factor_term
 
 
+def sample_gmm_factor_model(
+    params: GMMParams,
+    num_samples: int,
+    generator: torch.Generator | None = None,
+    tau: float = 1.0,
+) -> Tensor:
+    """Draw `mu_k + sigma_k * z + F @ eps`, `k` a Gumbel-softmax component pick.
+
+    Each Monte Carlo draw independently picks one of the `K` Gaussian components
+    per (series, horizon) via a straight-through Gumbel-softmax over `logits`:
+    one-hot (a true mixture draw, not a component-average) on the forward pass,
+    soft on the backward pass so gradients still reach `mu`/`sigma`/`logits`.
+    Both the component pick and the Gaussian noise accept `generator`, mirroring
+    `sample_factor_model`.
+    """
+    mu, sigma, logits, loadings = params.mu, params.sigma, params.logits, params.F
+    if not (mu.shape == sigma.shape == logits.shape):
+        raise ValueError(
+            f"mu {tuple(mu.shape)}, sigma {tuple(sigma.shape)} and logits "
+            f"{tuple(logits.shape)} must all match"
+        )
+    if loadings.shape[:-1] != mu.shape[:-1]:
+        raise ValueError(
+            f"F leading dims {tuple(loadings.shape[:-1])} must match mu's series "
+            f"dims {tuple(mu.shape[:-1])}"
+        )
+    lead, n_bottom, n_components = mu.shape[:-2], mu.shape[-2], mu.shape[-1]
+    n_factors = loadings.shape[-1]
+    kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
+
+    expanded_logits = logits.unsqueeze(-2).expand(
+        *lead, n_bottom, num_samples, n_components
+    )
+    u = torch.rand(expanded_logits.shape, **kw).clamp(1e-9, 1.0 - 1e-9)
+    gumbel = -torch.log(-torch.log(u))
+    y_soft = torch.softmax((expanded_logits + gumbel) / tau, dim=-1)
+    y_hard = torch.zeros_like(y_soft).scatter_(-1, y_soft.argmax(-1, keepdim=True), 1.0)
+    weights = y_hard + (y_soft - y_soft.detach())
+
+    mu_sample = (weights * mu.unsqueeze(-2)).sum(-1)
+    sigma_sample = (weights * sigma.unsqueeze(-2)).sum(-1)
+
+    z = torch.randn(*lead, n_bottom, num_samples, **kw)
+    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
+    return mu_sample + sigma_sample * z + factor_term
+
+
 def coherent_aggregate(S: Tensor, bottom: Tensor, clip: bool = True) -> Tensor:
     """Clip to non-negative first, then aggregate through S. The order matters."""
     if S.shape[-1] != bottom.shape[-2]:
@@ -82,7 +130,7 @@ def coherent_aggregate(S: Tensor, bottom: Tensor, clip: bool = True) -> Tensor:
 
 
 def sample_coherent(
-    params: FactorParams | SkewTParams,
+    params: FactorParams | SkewTParams | GMMParams,
     S: Tensor,
     num_samples: int,
     generator: torch.Generator | None = None,
@@ -91,13 +139,15 @@ def sample_coherent(
     """Sample the bottom-level distribution and aggregate through S in one call.
 
     Dispatches on `params`' type: `FactorParams` draws Gaussian factor-model
-    samples, `SkewTParams` draws skew-t factor-model samples.
+    samples, `SkewTParams` draws skew-t samples, `GMMParams` draws Gaussian-
+    mixture samples.
     """
-    sampler = (
-        sample_skew_t_factor_model
-        if isinstance(params, SkewTParams)
-        else sample_factor_model
-    )
+    if isinstance(params, SkewTParams):
+        sampler = sample_skew_t_factor_model
+    elif isinstance(params, GMMParams):
+        sampler = sample_gmm_factor_model
+    else:
+        sampler = sample_factor_model
     bottom = sampler(params, num_samples, generator=generator)
     return ForecastSamples(
         bottom=bottom, hierarchy=coherent_aggregate(S, bottom, clip=clip)

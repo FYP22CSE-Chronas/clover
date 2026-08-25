@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from contracts import FactorParams, SkewTParams
+from contracts import FactorParams, GMMParams, SkewTParams
 from model.normalization import (
     SCALERS,
     denormalize,
@@ -92,6 +92,25 @@ def test_denormalize_skew_t_params_scales_shape_free_terms() -> None:
     torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
     torch.testing.assert_close(raw.nu, params.nu)
     torch.testing.assert_close(raw.lam, params.lam)
+    torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
+
+
+def test_denormalize_gmm_params_scales_shape_free_terms() -> None:
+    """mu/sigma/F scale affinely; logits are scale-free and must pass through."""
+    torch.manual_seed(0)
+    stats = window_stats(torch.rand(1, L, N) * 20 + 5, "standard")
+    params = GMMParams(
+        mu=torch.randn(1, 4, N, 2),
+        sigma=torch.rand(1, 4, N, 2) + 0.1,
+        logits=torch.randn(1, 4, N, 2),
+        F=torch.randn(1, 4, N, 2),
+    )
+    raw = denormalize_params(params, stats)
+    scale = stats.scale.unsqueeze(-1)
+    loc = stats.loc.unsqueeze(-1)
+    torch.testing.assert_close(raw.mu, params.mu * scale + loc)
+    torch.testing.assert_close(raw.sigma, params.sigma * scale)
+    torch.testing.assert_close(raw.logits, params.logits)
     torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
 
 
