@@ -5,7 +5,7 @@ name: m5
 # pipeline/panel_runner.py.
 
 data:
-  dir: data/m5/panel
+  dir: data/raw/m5/panel
   h: 28
   # The dilated stack sees 1 + sum([1,2,4,8,16]) = 32 steps, so 84 (3x28) covers its
   # receptive field with headroom.

@@ -2,9 +2,9 @@
 
     python scripts/build_m5_panel.py
 
-Reads data/m5/*.csv -- the raw Kaggle "M5 Forecasting - Accuracy" files
+Reads data/raw/m5/*.csv -- the raw Kaggle "M5 Forecasting - Accuracy" files
 (`sales_train_evaluation.csv` or `sales_train_validation.csv`, `sell_prices.csv`,
-`calendar.csv`) -- and writes memmap-friendly arrays to data/m5/panel/:
+`calendar.csv`) -- and writes memmap-friendly arrays to data/raw/m5/panel/:
 
     sales.npy   [n_items, T, 10] float32   daily unit sales; the Kaggle wide file is
                                             already dense and zero-filled pre-launch
@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RAW_DIR = os.path.join(PROJECT_ROOT, "data", "m5")
+RAW_DIR = os.path.join(PROJECT_ROOT, "data", "raw", "m5")
 OUT_DIR = os.path.join(RAW_DIR, "panel")
 
 SALES_FILES = ("sales_train_evaluation.csv", "sales_train_validation.csv")

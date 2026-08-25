@@ -12,3 +12,7 @@ checkpoints/
 # Datasets: the CSV pairs are small enough to track; the Favorita bulk is not.
 data/favorita/train.csv
 data/favorita/panel/
+
+# M5's raw CSVs (~500MB) and built panel are bulk in the same way.
+data/raw/m5/*.csv
+data/raw/m5/panel/
