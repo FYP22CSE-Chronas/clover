@@ -4,12 +4,13 @@ import numpy as np
 import pytest
 import torch
 
-from contracts import FactorParams, SkewTParams
+from contracts import FactorParams, GMMParams, SkewTParams
 from model.distribution import (
     aggregate_targets,
     coherent_aggregate,
     sample_coherent,
     sample_factor_model,
+    sample_gmm_factor_model,
     sample_skew_t_factor_model,
 )
 
@@ -155,3 +156,77 @@ def test_skew_t_positive_lambda_skews_right() -> None:
     )
     samples = sample_skew_t_factor_model(params, num_samples=200_000)
     assert samples.mean().item() > 0.0
+
+
+N_COMPONENTS = 2
+
+
+def _gmm_params(n_bottom: int) -> GMMParams:
+    return GMMParams(
+        mu=torch.randn(B, H, n_bottom, N_COMPONENTS),
+        sigma=torch.rand(B, H, n_bottom, N_COMPONENTS) + 0.1,
+        logits=torch.randn(B, H, n_bottom, N_COMPONENTS),
+        F=torch.randn(B, H, n_bottom, K) * 0.1,
+    )
+
+
+def test_gmm_sample_shape(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    samples = sample_gmm_factor_model(_gmm_params(n_bottom), num_samples=16)
+    assert samples.shape == (B, H, n_bottom, 16)
+
+
+def test_gmm_samples_are_coherent(S: np.ndarray) -> None:
+    S_t = torch.as_tensor(S)
+    draws = sample_coherent(_gmm_params(S.shape[1]), S_t, num_samples=32)
+    expected = torch.einsum("ij,bhjn->bhin", S_t, torch.relu(draws.bottom))
+    torch.testing.assert_close(draws.hierarchy, expected)
+
+
+def test_gmm_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
+    params = _gmm_params(S.shape[1])
+    a = sample_gmm_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    b = sample_gmm_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    torch.testing.assert_close(a, b)
+
+
+def test_gmm_rejects_mismatched_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _gmm_params(n_bottom)
+    bad = GMMParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        logits=params.logits[..., :-1],
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="must all match"):
+        sample_gmm_factor_model(bad, num_samples=4)
+
+
+def test_gmm_is_a_true_mixture_not_an_averaged_gaussian() -> None:
+    """Two far-apart, narrow components: draws must cluster near one mean or the
+    other, not smear across the gap the way a single averaged Gaussian would."""
+    torch.manual_seed(0)
+    params = GMMParams(
+        mu=torch.tensor([-10.0, 10.0]).reshape(1, 1, 1, 2),
+        sigma=torch.full((1, 1, 1, 2), 0.1),
+        logits=torch.zeros(1, 1, 1, 2),
+        F=torch.zeros(1, 1, 1, 1),
+    )
+    samples = sample_gmm_factor_model(params, num_samples=20_000)
+    in_gap = ((samples > -2.0) & (samples < 2.0)).float().mean()
+    assert in_gap.item() < 0.01
+    near_either_mode = ((samples < -8.0) | (samples > 8.0)).float().mean()
+    assert near_either_mode.item() > 0.95
+
+
+def test_gmm_logits_control_which_component_dominates() -> None:
+    torch.manual_seed(0)
+    params = GMMParams(
+        mu=torch.tensor([-10.0, 10.0]).reshape(1, 1, 1, 2),
+        sigma=torch.full((1, 1, 1, 2), 0.1),
+        logits=torch.tensor([-10.0, 10.0]).reshape(1, 1, 1, 2),
+        F=torch.zeros(1, 1, 1, 1),
+    )
+    samples = sample_gmm_factor_model(params, num_samples=20_000)
+    assert (samples > 0).float().mean().item() > 0.95

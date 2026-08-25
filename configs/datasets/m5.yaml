@@ -1,0 +1,49 @@
+name: m5
+# A panel, not a single hierarchy: 3,049 Walmart items, each an independent copy of
+# the same 14-row store geography (national / 3 states / 10 stores), ~30,490 bottom
+# series in all. Loaded by data/m5.py into a PanelDataset and run by
+# pipeline/panel_runner.py.
+
+data:
+  dir: data/m5/panel
+  h: 28
+  # The dilated stack sees 1 + sum([1,2,4,8,16]) = 32 steps, so 84 (3x28) covers its
+  # receptive field with headroom.
+  input_size: 84
+  split: {strategy: block, train: 1850, val: 28, test: 28}
+
+# Static, historical and future blocks come from the panel loader rather than the
+# feature registry: they are per-item and per-store, not functions of the calendar
+# alone. Department dummies + state dummies (static), SNAP eligibility (historical),
+# sell price + day of week (future).
+features: {}
+
+model:
+  temp_conv_channels: 20
+  dilations: [1, 2, 4, 8, 16]
+  cross_series_hidden: 20
+  static_encoder_dim: 10
+  future_encoder_dim: 20
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 5
+
+train:
+  learning_rate: 5.0e-4
+  max_steps: 80000
+  batch_size: 4
+  # 0 disables early stopping; the final weights are the ones evaluated.
+  early_stop_patience: 0
+  restore_best: false
+  # Validation is 3,049 windows; checking all of them every 100 steps would cost more
+  # than the training run itself.
+  val_check_steps: 2000
+  checkpoint_every: 2000
+  val_mc_samples: 100
+  # Sales are non-negative counts with many zeros, so a scale-only normalizer beats
+  # the standard z-score here.
+  scaler: mean_floor
+  # Normalizing by each batch's target mass explodes when a batch of four sparse items
+  # carries almost none. sCRPS is a ratio of sums over the whole test set, so the raw
+  # sum is the better minibatch objective.
+  normalize_loss: false

@@ -20,6 +20,7 @@ def test_every_shipped_dataset_has_a_config() -> None:
     assert set(DATASETS) == {
         "favorita",
         "labour",
+        "m5",
         "police",
         "prison",
         "tourism_large",

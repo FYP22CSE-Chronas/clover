@@ -43,6 +43,22 @@ class SkewTParams:
 
 
 @dataclass(frozen=True)
+class GMMParams:
+    """K-component Gaussian-mixture factor-model parameters at the bottom level.
+
+    Extends the mu/sigma/F factor structure with per-component `mu`/`sigma` and
+    `logits` (softmax-normalized per series/horizon into K mixture weights); the
+    factor loadings `F` stay shared across components rather than duplicated K
+    times.
+    """
+
+    mu: Tensor  # [B, H, Nb, K]
+    sigma: Tensor  # [B, H, Nb, K]
+    logits: Tensor  # [B, H, Nb, K]
+    F: Tensor  # [B, H, Nb, Kf]
+
+
+@dataclass(frozen=True)
 class ScaleStats:
     """Per-window, per-series location and scale, broadcastable over time."""
 
@@ -100,6 +116,6 @@ class Decoder(Protocol):
 
 
 class Head(Protocol):
-    """[B, Nb, H, D'] -> FactorParams or SkewTParams."""
+    """[B, Nb, H, D'] -> FactorParams, SkewTParams or GMMParams."""
 
-    def __call__(self, z: Tensor) -> FactorParams | SkewTParams: ...
+    def __call__(self, z: Tensor) -> FactorParams | SkewTParams | GMMParams: ...

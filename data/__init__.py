@@ -8,6 +8,7 @@ from data.dataset import ExogenousFeatures, HierarchicalDataset
 from data.favorita import load_favorita
 from data.features import FEATURE_REGISTRY, build_features, check_anchor_lags
 from data.hierarchy import level_masks, level_tags, validate_level_slices
+from data.m5 import load_m5
 from data.panel import PanelDataset, PanelSplit, build_panel_split
 from data.windows import SPLITS, Window, WindowSplit, build_split, rolling_windows
 
@@ -16,7 +17,7 @@ PanelLoader = Callable[[DataConfig], PanelDataset]
 
 # Datasets needing a loader other than the default CSV pair.
 HIERARCHY_LOADERS: dict[str, HierarchyLoader] = {}
-PANEL_LOADERS: dict[str, PanelLoader] = {"favorita": load_favorita}
+PANEL_LOADERS: dict[str, PanelLoader] = {"favorita": load_favorita, "m5": load_m5}
 
 
 def is_panel(name: str) -> bool:
@@ -63,6 +64,7 @@ __all__ = [
     "load",
     "load_csv_hierarchy",
     "load_favorita",
+    "load_m5",
     "load_panel",
     "rolling_windows",
     "validate_level_slices",
