@@ -3,7 +3,16 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, ForecastSamples, GMMParams, SkewTParams
+from contracts import (
+    FactorParams,
+    ForecastSamples,
+    GMMParams,
+    SkewTParams,
+    SplineCopulaParams,
+)
+from model.blocks import rq_spline_transform
+
+SCALE_FLOOR = 1e-6
 
 
 def sample_factor_model(
@@ -119,6 +128,52 @@ def sample_gmm_factor_model(
     return mu_sample + sigma_sample * z + factor_term
 
 
+def sample_spline_copula_factor_model(
+    params: SplineCopulaParams,
+    num_samples: int,
+    generator: torch.Generator | None = None,
+) -> Tensor:
+    """Draw `mu + s * T(g)`: a Gaussian factor copula with learned marginals.
+
+    The factor term `sigma * z + F @ eps` is built exactly as in
+    `sample_factor_model`, then divided by its own standard deviation
+    `s = sqrt(sigma^2 + sum_k F_k^2)`. The result `g` is marginally standard normal
+    while its cross-series dependence is still the low-rank factor structure -- that
+    is, `g` carries the Gaussian copula and nothing else. A monotone spline `T` then
+    reshapes each marginal, and `mu`/`s` put it back on the series' own location and
+    scale.
+
+    Standardizing before the spline is what keeps the parameterization identified
+    (`s` cannot be silently absorbed into `T`'s slope) and what keeps `theta`
+    scale-free, so `denormalize_params` stays an exact affine inverse. With
+    `theta = 0` the spline is the identity and this reduces to `sample_factor_model`
+    draw for draw under the same `generator`.
+    """
+    mu, sigma, loadings, theta = params.mu, params.sigma, params.F, params.theta
+    if mu.shape != sigma.shape:
+        raise ValueError(f"mu {tuple(mu.shape)} and sigma {tuple(sigma.shape)} differ")
+    if loadings.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"F leading dims {tuple(loadings.shape[:-1])} must match mu {tuple(mu.shape)}"
+        )
+    if theta.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"theta leading dims {tuple(theta.shape[:-1])} must match mu "
+            f"{tuple(mu.shape)}"
+        )
+    lead, n_bottom = mu.shape[:-1], mu.shape[-1]
+    n_factors = loadings.shape[-1]
+    kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
+    z = torch.randn(*lead, n_bottom, num_samples, **kw)
+    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
+
+    scale = torch.sqrt(sigma**2 + (loadings**2).sum(dim=-1)).clamp_min(SCALE_FLOOR)
+    latent = (sigma.unsqueeze(-1) * z + factor_term) / scale.unsqueeze(-1)
+    shaped = rq_spline_transform(latent, theta, bound=params.bound)
+    return mu.unsqueeze(-1) + scale.unsqueeze(-1) * shaped
+
+
 def coherent_aggregate(S: Tensor, bottom: Tensor, clip: bool = True) -> Tensor:
     """Clip to non-negative first, then aggregate through S. The order matters."""
     if S.shape[-1] != bottom.shape[-2]:
@@ -130,7 +185,7 @@ def coherent_aggregate(S: Tensor, bottom: Tensor, clip: bool = True) -> Tensor:
 
 
 def sample_coherent(
-    params: FactorParams | SkewTParams | GMMParams,
+    params: FactorParams | SkewTParams | GMMParams | SplineCopulaParams,
     S: Tensor,
     num_samples: int,
     generator: torch.Generator | None = None,
@@ -140,12 +195,15 @@ def sample_coherent(
 
     Dispatches on `params`' type: `FactorParams` draws Gaussian factor-model
     samples, `SkewTParams` draws skew-t samples, `GMMParams` draws Gaussian-
-    mixture samples.
+    mixture samples, and `SplineCopulaParams` draws Gaussian-copula samples with
+    learned marginals.
     """
     if isinstance(params, SkewTParams):
         sampler = sample_skew_t_factor_model
     elif isinstance(params, GMMParams):
         sampler = sample_gmm_factor_model
+    elif isinstance(params, SplineCopulaParams):
+        sampler = sample_spline_copula_factor_model
     else:
         sampler = sample_factor_model
     bottom = sampler(params, num_samples, generator=generator)

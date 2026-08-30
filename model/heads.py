@@ -5,11 +5,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from contracts import FactorParams, GMMParams, SkewTParams
+from contracts import FactorParams, GMMParams, SkewTParams, SplineCopulaParams
 from model.blocks import MLPBlock
 from registry import Registry
 
 HEADS: Registry[nn.Module] = Registry("head")
+
+
+
+def _zero_last_layer(block: MLPBlock) -> None:
+    """Zero an MLP's output layer so the block starts life emitting exact zeros.
+
+    Used to make a spline head begin at the identity transform: random knots would
+    start the model at an arbitrary marginal distortion, which is both a worse
+    starting point than the Gaussian baseline and an unfair comparison against it.
+    """
+    last = block.net[-1]
+    nn.init.zeros_(last.weight)
+    nn.init.zeros_(last.bias)
 
 
 @HEADS.register("factor_model")
@@ -173,6 +186,121 @@ class SkewTSharedHead(nn.Module):
         nu = (F.softplus(self.nu_raw) + self.nu_floor).expand_as(mu)
         lam = self.lam_raw.expand_as(mu)
         return SkewTParams(mu=mu, sigma=self._sigma(sigma_raw), nu=nu, lam=lam, F=loadings)
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
+@HEADS.register("spline_copula")
+class SplineCopulaHead(nn.Module):
+    """Gaussian factor copula with a learned monotone marginal per (series, horizon).
+
+    Emits the same `2 + K` factor parameters as `FactorModelHead` plus `3*n_bins - 1`
+    raw spline knots. The knot projection is zero-initialized, so at step 0 the
+    spline is the identity and this head reproduces `FactorModelHead` exactly --
+    training can only move away from the Gaussian baseline, never start somewhere
+    worse than it.
+
+    The spline is nonparametric where `SkewTHead` (two shape parameters) and
+    `GMMHead` (K modes) are parametric: it can bend the marginal into any monotone
+    shape, at the cost of `3*n_bins - 1` parameters per output instead of 2.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_bins: int = 8,
+        spline_bound: float = 3.0,
+    ) -> None:
+        super().__init__()
+        if n_bins < 2:
+            raise ValueError(f"n_bins must be >= 2, got {n_bins}")
+        if spline_bound <= 0.0:
+            raise ValueError(f"spline_bound must be > 0, got {spline_bound}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_bins = n_bins
+        self.spline_bound = spline_bound
+        self.proj = MLPBlock(in_dim, 2 + n_factors)
+        self.spline_proj = MLPBlock(in_dim, 3 * n_bins - 1)
+        _zero_last_layer(self.spline_proj)
+
+    def forward(self, z: Tensor) -> SplineCopulaParams:
+        """[B, Nb, H, D] -> mu/sigma [B, H, Nb], F [B, H, Nb, K], theta [B, H, Nb, P]."""
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+        loadings = params[..., 2:].permute(0, 2, 1, 3)
+        theta = self.spline_proj(z).permute(0, 2, 1, 3)
+        return SplineCopulaParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            F=loadings,
+            theta=theta,
+            bound=self.spline_bound,
+        )
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
+@HEADS.register("spline_copula_shared")
+class SplineCopulaSharedHead(nn.Module):
+    """`SplineCopulaHead` with one global spline instead of one per output.
+
+    The same flexibility/data tradeoff `SkewTSharedHead` makes against `SkewTHead`:
+    a per-(series, horizon) spline needs enough windows to estimate `3*n_bins - 1`
+    knots everywhere, which a small panel does not have. Tying the knots to a single
+    set shared across every output learns one marginal shape correction for the whole
+    hierarchy, which is far cheaper to fit.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_bins: int = 8,
+        spline_bound: float = 3.0,
+    ) -> None:
+        super().__init__()
+        if n_bins < 2:
+            raise ValueError(f"n_bins must be >= 2, got {n_bins}")
+        if spline_bound <= 0.0:
+            raise ValueError(f"spline_bound must be > 0, got {spline_bound}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_bins = n_bins
+        self.spline_bound = spline_bound
+        self.proj = MLPBlock(in_dim, 2 + n_factors)
+        self.theta_raw = nn.Parameter(torch.zeros(3 * n_bins - 1))
+
+    def forward(self, z: Tensor) -> SplineCopulaParams:
+        """[B, Nb, H, D] -> the factor parameters plus one broadcast spline."""
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+        loadings = params[..., 2:].permute(0, 2, 1, 3)
+        theta = self.theta_raw.expand(*mu.shape, self.theta_raw.shape[0])
+        return SplineCopulaParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            F=loadings,
+            theta=theta,
+            bound=self.spline_bound,
+        )
 
     def _sigma(self, sigma_raw: Tensor) -> Tensor:
         """Positivity constraint on the predicted scale."""

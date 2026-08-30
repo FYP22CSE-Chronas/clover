@@ -59,6 +59,29 @@ class GMMParams:
 
 
 @dataclass(frozen=True)
+class SplineCopulaParams:
+    """Gaussian factor copula with learned, nonparametric marginals.
+
+    Keeps the same mu/sigma/F factor structure as `FactorParams`, but the
+    standardized latent it induces is pushed through a monotone rational-quadratic
+    spline before being placed by mu/scale. `theta` holds that spline's raw knot
+    parameters -- `3 * n_bins - 1` of them per (series, horizon) -- and is
+    *scale-free*: because the spline acts on a latent standardized to unit
+    variance, `theta` passes through `denormalize_params` untouched exactly as a
+    skew-t's `nu`/`lam` does, and the affine denormalization stays exact.
+
+    `theta = 0` is the identity transform, so a zero-initialized head reproduces
+    `FactorParams` sampling exactly.
+    """
+
+    mu: Tensor  # [B, H, Nb]
+    sigma: Tensor  # [B, H, Nb]
+    F: Tensor  # [B, H, Nb, K]
+    theta: Tensor  # [B, H, Nb, 3 * n_bins - 1]
+    bound: float = 3.0  # spline is the identity outside [-bound, bound]
+
+
+@dataclass(frozen=True)
 class ScaleStats:
     """Per-window, per-series location and scale, broadcastable over time."""
 

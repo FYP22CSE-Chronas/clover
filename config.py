@@ -50,6 +50,8 @@ class ModelConfig:
     horizon_specific_dim: int = 5
     horizon_agnostic_dim: int = 10
     n_factors: int = 10
+    n_bins: int = 8
+    spline_bound: float = 3.0
     sigma_activation: str = "softplus"
     sigma_eps: float = 1e-3
     encoder: str = "dilated_conv"
@@ -70,6 +72,10 @@ class ModelConfig:
             raise ValueError("kernel_size must be >= 1")
         if self.n_factors < 1:
             raise ValueError("n_factors must be >= 1")
+        if self.n_bins < 2:
+            raise ValueError("n_bins must be >= 2")
+        if self.spline_bound <= 0.0:
+            raise ValueError("spline_bound must be > 0")
         if self.cross_series_hidden < 0:
             raise ValueError("cross_series_hidden must be >= 0 (0 disables the mixer)")
 

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import inspect
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -12,6 +16,18 @@ from model.decoders import DECODERS
 from model.encoders import ENCODERS
 from model.heads import HEADS
 from model.mixers import MIXERS
+
+
+def _declared(factory: Callable[..., Any], **kwargs: Any) -> dict[str, Any]:
+    """Keep only the arguments a component's constructor actually declares.
+
+    Heads opt into hyperparameters by naming them, so a head with no spline need not
+    accept `n_bins`. Nothing is silently swallowed: every key here comes from a
+    `ModelConfig` field, and config typos are already rejected by the strict
+    dataclass parsing in `config.py`.
+    """
+    declared = inspect.signature(factory).parameters
+    return {k: v for k, v in kwargs.items() if k in declared}
 
 
 class CLOVER(nn.Module):
@@ -77,10 +93,15 @@ class CLOVER(nn.Module):
         )
         self.head = HEADS.create(
             config.head,
-            in_dim=self.decoder.out_dim,
-            n_factors=config.n_factors,
-            sigma_activation=config.sigma_activation,
-            sigma_eps=config.sigma_eps,
+            **_declared(
+                HEADS.get(config.head),
+                in_dim=self.decoder.out_dim,
+                n_factors=config.n_factors,
+                sigma_activation=config.sigma_activation,
+                sigma_eps=config.sigma_eps,
+                n_bins=config.n_bins,
+                spline_bound=config.spline_bound,
+            ),
         )
 
     @property

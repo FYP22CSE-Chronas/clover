@@ -5,7 +5,7 @@ from typing import Protocol
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, GMMParams, ScaleStats, SkewTParams
+from contracts import FactorParams, GMMParams, ScaleStats, SkewTParams, SplineCopulaParams
 from registry import Registry
 
 EPS = 1e-6
@@ -86,13 +86,16 @@ def denormalize(x: Tensor, stats: ScaleStats) -> Tensor:
 
 
 def denormalize_params(
-    params: FactorParams | SkewTParams | GMMParams, stats: ScaleStats
-) -> FactorParams | SkewTParams | GMMParams:
+    params: FactorParams | SkewTParams | GMMParams | SplineCopulaParams,
+    stats: ScaleStats,
+) -> FactorParams | SkewTParams | GMMParams | SplineCopulaParams:
     """Push (loc, scale) back onto mu/sigma/F so samples land in raw units.
 
-    All three factor models are affine in mu/sigma/F, so this inverse is exact.
-    A skew-t's `nu`/`lam` and a mixture's `logits` are scale-free and pass
-    through unchanged.
+    Every factor model here is affine in mu/sigma/F, so this inverse is exact.
+    A skew-t's `nu`/`lam`, a mixture's `logits` and a spline copula's `theta` are
+    scale-free and pass through unchanged -- `theta` in particular acts on a latent
+    already standardized to unit variance, so scaling mu/sigma/F rescales the drawn
+    sample exactly and the spline never sees the change.
     """
     if isinstance(params, SkewTParams):
         return SkewTParams(
@@ -108,6 +111,14 @@ def denormalize_params(
             sigma=params.sigma * stats.scale.unsqueeze(-1),
             logits=params.logits,
             F=params.F * stats.scale.unsqueeze(-1),
+        )
+    if isinstance(params, SplineCopulaParams):
+        return SplineCopulaParams(
+            mu=params.mu * stats.scale + stats.loc,
+            sigma=params.sigma * stats.scale,
+            F=params.F * stats.scale.unsqueeze(-1),
+            theta=params.theta,
+            bound=params.bound,
         )
     return FactorParams(
         mu=params.mu * stats.scale + stats.loc,
