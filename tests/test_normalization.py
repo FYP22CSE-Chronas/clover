@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from contracts import FactorParams, GMMParams, SkewTParams
+from contracts import FactorParams, FlowParams, GMMParams, SkewTParams
 from model.normalization import (
     SCALERS,
     denormalize,
@@ -92,6 +92,27 @@ def test_denormalize_skew_t_params_scales_shape_free_terms() -> None:
     torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
     torch.testing.assert_close(raw.nu, params.nu)
     torch.testing.assert_close(raw.lam, params.lam)
+    torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
+
+
+def test_denormalize_flow_params_scales_shape_free_terms() -> None:
+    """mu/sigma/F scale affinely; the flow parameters are scale-free and pass through."""
+    torch.manual_seed(0)
+    stats = window_stats(torch.rand(1, L, N) * 20 + 5, "standard")
+    params = FlowParams(
+        mu=torch.randn(1, 4, N),
+        sigma=torch.rand(1, 4, N) + 0.1,
+        flow_w=torch.randn(1, 4, N, 3),
+        flow_a=torch.randn(1, 4, N, 3),
+        flow_b=torch.randn(1, 4, N, 3),
+        F=torch.randn(1, 4, N, 2),
+    )
+    raw = denormalize_params(params, stats)
+    torch.testing.assert_close(raw.mu, params.mu * stats.scale + stats.loc)
+    torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
+    torch.testing.assert_close(raw.flow_w, params.flow_w)
+    torch.testing.assert_close(raw.flow_a, params.flow_a)
+    torch.testing.assert_close(raw.flow_b, params.flow_b)
     torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
 
 

@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from contracts import FactorParams, GMMParams, SkewTParams
+from contracts import FactorParams, FlowParams, GMMParams, SkewTParams
 from model.blocks import MLPBlock
 from registry import Registry
 
@@ -90,6 +90,137 @@ class SkewTHead(nn.Module):
         return F.softplus(nu_raw) + self.nu_floor
 
 
+def _flow_shape(
+    w_raw: Tensor, a_raw: Tensor, b: Tensor, a_floor: float
+) -> tuple[Tensor, Tensor, Tensor]:
+    """Activate a deep-sigmoidal-flow unit's raw weight/slope into a valid one.
+
+    `w = softmax(w_raw)` is a convex combination; `a = softplus(a_raw) + a_floor`
+    keeps every unit's slope bounded away from 0, the way `nu_floor` keeps a skew-t's
+    degrees of freedom away from the region where gradients vanish. `b` needs no
+    activation, exactly like a skew-t's `lam`.
+    """
+    return torch.softmax(w_raw, dim=-1), F.softplus(a_raw) + a_floor, b
+
+
+@HEADS.register("normalizing_flow")
+class NormalizingFlowHead(nn.Module):
+    """Emits 2 + 3*K_flow + K values per (series, horizon): mu, raw sigma, K_flow
+    deep-sigmoidal-flow units (raw weight/slope/shift each), and K loadings.
+
+    Replaces the fixed skew-t/Gaussian innovation shape with a learned one: the
+    K_flow sigmoid units let `sample_flow_factor_model` warp a standard normal into
+    whatever skew, tail weight or (with enough units) multimodality the residuals
+    actually show, while keeping the same mu/sigma/F factor structure -- and so the
+    same coherence and denormalization machinery -- as every other head.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_flow_components: int = 8,
+        a_floor: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if n_flow_components < 1:
+            raise ValueError(f"n_flow_components must be >= 1, got {n_flow_components}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_flow_components = n_flow_components
+        self.a_floor = a_floor
+        self.proj = MLPBlock(in_dim, 2 + 3 * n_flow_components + n_factors)
+
+    def forward(self, z: Tensor) -> FlowParams:
+        """[B, Nb, H, D] -> mu/sigma [B, H, Nb], flow params/loadings [B, H, Nb, *]."""
+        k = self.n_flow_components
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+        flow_w_raw = params[..., 2 : 2 + k].permute(0, 2, 1, 3)
+        flow_a_raw = params[..., 2 + k : 2 + 2 * k].permute(0, 2, 1, 3)
+        flow_b = params[..., 2 + 2 * k : 2 + 3 * k].permute(0, 2, 1, 3)
+        loadings = params[..., 2 + 3 * k :].permute(0, 2, 1, 3)
+        flow_w, flow_a, flow_b = _flow_shape(flow_w_raw, flow_a_raw, flow_b, self.a_floor)
+        return FlowParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            flow_w=flow_w,
+            flow_a=flow_a,
+            flow_b=flow_b,
+            F=loadings,
+        )
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
+@HEADS.register("normalizing_flow_shared")
+class NormalizingFlowSharedHead(nn.Module):
+    """`NormalizingFlowHead` with one global flow instead of one per output.
+
+    A per-series-per-horizon flow fits `3 * n_flow_components` shape parameters per
+    output -- far more than a skew-t's two (`nu`/`lam`) -- so on a small hierarchy it
+    is even more exposed to the flexibility/data tradeoff that motivates
+    `SkewTSharedHead`. Tying the flow to one global set of weight/slope/shift
+    parameters, shared across every (series, horizon), trades that per-output
+    flexibility for far fewer shape parameters to fit.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_flow_components: int = 8,
+        a_floor: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if n_flow_components < 1:
+            raise ValueError(f"n_flow_components must be >= 1, got {n_flow_components}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_flow_components = n_flow_components
+        self.a_floor = a_floor
+        self.proj = MLPBlock(in_dim, 2 + n_factors)
+        self.flow_w_raw = nn.Parameter(torch.zeros(n_flow_components))
+        self.flow_a_raw = nn.Parameter(torch.zeros(n_flow_components))
+        self.flow_b = nn.Parameter(torch.zeros(n_flow_components))
+
+    def forward(self, z: Tensor) -> FlowParams:
+        """[B, Nb, H, D] -> mu/sigma [B, H, Nb], loadings [B, H, Nb, K], global flow."""
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+        loadings = params[..., 2:].permute(0, 2, 1, 3)
+        flow_w, flow_a, flow_b = _flow_shape(
+            self.flow_w_raw, self.flow_a_raw, self.flow_b, self.a_floor
+        )
+        shape = (*mu.shape, self.n_flow_components)
+        return FlowParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            flow_w=flow_w.expand(shape),
+            flow_a=flow_a.expand(shape),
+            flow_b=flow_b.expand(shape),
+            F=loadings,
+        )
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
 @HEADS.register("gmm")
 class GMMHead(nn.Module):
     """Emits 3K + K_factors values per (series, horizon): K means, K raw scales,
@@ -172,7 +303,9 @@ class SkewTSharedHead(nn.Module):
         loadings = params[..., 2:].permute(0, 2, 1, 3)
         nu = (F.softplus(self.nu_raw) + self.nu_floor).expand_as(mu)
         lam = self.lam_raw.expand_as(mu)
-        return SkewTParams(mu=mu, sigma=self._sigma(sigma_raw), nu=nu, lam=lam, F=loadings)
+        return SkewTParams(
+            mu=mu, sigma=self._sigma(sigma_raw), nu=nu, lam=lam, F=loadings
+        )
 
     def _sigma(self, sigma_raw: Tensor) -> Tensor:
         """Positivity constraint on the predicted scale."""

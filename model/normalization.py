@@ -5,7 +5,7 @@ from typing import Protocol
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, GMMParams, ScaleStats, SkewTParams
+from contracts import FactorParams, FlowParams, GMMParams, ScaleStats, SkewTParams
 from registry import Registry
 
 EPS = 1e-6
@@ -86,13 +86,13 @@ def denormalize(x: Tensor, stats: ScaleStats) -> Tensor:
 
 
 def denormalize_params(
-    params: FactorParams | SkewTParams | GMMParams, stats: ScaleStats
-) -> FactorParams | SkewTParams | GMMParams:
+    params: FactorParams | SkewTParams | FlowParams | GMMParams, stats: ScaleStats
+) -> FactorParams | SkewTParams | FlowParams | GMMParams:
     """Push (loc, scale) back onto mu/sigma/F so samples land in raw units.
 
-    All three factor models are affine in mu/sigma/F, so this inverse is exact.
-    A skew-t's `nu`/`lam` and a mixture's `logits` are scale-free and pass
-    through unchanged.
+    Every factor model is affine in mu/sigma/F, so this inverse is exact. A skew-t's
+    `nu`/`lam`, a flow's `flow_w`/`flow_a`/`flow_b`, and a mixture's `logits` are
+    scale-free and pass through unchanged.
     """
     if isinstance(params, SkewTParams):
         return SkewTParams(
@@ -100,6 +100,15 @@ def denormalize_params(
             sigma=params.sigma * stats.scale,
             nu=params.nu,
             lam=params.lam,
+            F=params.F * stats.scale.unsqueeze(-1),
+        )
+    if isinstance(params, FlowParams):
+        return FlowParams(
+            mu=params.mu * stats.scale + stats.loc,
+            sigma=params.sigma * stats.scale,
+            flow_w=params.flow_w,
+            flow_a=params.flow_a,
+            flow_b=params.flow_b,
             F=params.F * stats.scale.unsqueeze(-1),
         )
     if isinstance(params, GMMParams):

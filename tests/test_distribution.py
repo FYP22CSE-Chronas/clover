@@ -4,12 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from contracts import FactorParams, GMMParams, SkewTParams
+from contracts import FactorParams, FlowParams, GMMParams, SkewTParams
 from model.distribution import (
+    _dsf_transform,
     aggregate_targets,
     coherent_aggregate,
     sample_coherent,
     sample_factor_model,
+    sample_flow_factor_model,
     sample_gmm_factor_model,
     sample_skew_t_factor_model,
 )
@@ -156,6 +158,81 @@ def test_skew_t_positive_lambda_skews_right() -> None:
     )
     samples = sample_skew_t_factor_model(params, num_samples=200_000)
     assert samples.mean().item() > 0.0
+
+
+K_FLOW = 3
+
+
+def _flow_params(n_bottom: int) -> FlowParams:
+    return FlowParams(
+        mu=torch.randn(B, H, n_bottom),
+        sigma=torch.rand(B, H, n_bottom) + 0.1,
+        flow_w=torch.softmax(torch.randn(B, H, n_bottom, K_FLOW), dim=-1),
+        flow_a=torch.rand(B, H, n_bottom, K_FLOW) + 0.1,
+        flow_b=torch.randn(B, H, n_bottom, K_FLOW),
+        F=torch.randn(B, H, n_bottom, K) * 0.1,
+    )
+
+
+def test_flow_sample_shape(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    samples = sample_flow_factor_model(_flow_params(n_bottom), num_samples=16)
+    assert samples.shape == (B, H, n_bottom, 16)
+
+
+def test_flow_samples_are_coherent(S: np.ndarray) -> None:
+    S_t = torch.as_tensor(S)
+    draws = sample_coherent(_flow_params(S.shape[1]), S_t, num_samples=32)
+    expected = torch.einsum("ij,bhjn->bhin", S_t, torch.relu(draws.bottom))
+    torch.testing.assert_close(draws.hierarchy, expected)
+
+
+def test_flow_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
+    params = _flow_params(S.shape[1])
+    a = sample_flow_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    b = sample_flow_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    torch.testing.assert_close(a, b)
+
+
+def test_flow_rejects_mismatched_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _flow_params(n_bottom)
+    bad = FlowParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        flow_w=params.flow_w[..., :-1],
+        flow_a=params.flow_a,
+        flow_b=params.flow_b,
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="must all match"):
+        sample_flow_factor_model(bad, num_samples=4)
+
+
+def test_dsf_transform_reduces_to_affine_with_one_component() -> None:
+    """logit(sigmoid(a*x+b)) == a*x+b exactly, so a single, unit-weight unit is a
+    pure affine warp."""
+    torch.manual_seed(0)
+    x = torch.randn(2, 3, 4, 5) * 0.5
+    w = torch.ones(2, 3, 4, 1)
+    a = torch.rand(2, 3, 4, 1) + 0.1
+    b = torch.randn(2, 3, 4, 1) * 0.5
+    t = _dsf_transform(x, w, a, b)
+    expected = a * x + b
+    torch.testing.assert_close(t, expected, atol=1e-4, rtol=1e-4)
+
+
+def test_dsf_transform_is_strictly_increasing() -> None:
+    """A convex combination of sigmoids composed with logit is strictly increasing
+    in `x` whenever every weight and slope is positive, which is what makes the flow
+    an invertible warp."""
+    torch.manual_seed(0)
+    grid = torch.linspace(-2.0, 2.0, 50).reshape(1, 1, 1, 50)
+    w = torch.softmax(torch.randn(1, 1, 1, 6), dim=-1)
+    a = torch.rand(1, 1, 1, 6) + 0.1
+    b = torch.randn(1, 1, 1, 6)
+    t = _dsf_transform(grid, w, a, b)
+    assert (t.diff(dim=-1) > 0).all()
 
 
 N_COMPONENTS = 2

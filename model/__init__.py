@@ -5,6 +5,7 @@ from model.distribution import (
     coherent_aggregate,
     sample_coherent,
     sample_factor_model,
+    sample_flow_factor_model,
     sample_gmm_factor_model,
     sample_skew_t_factor_model,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "normalize",
     "sample_coherent",
     "sample_factor_model",
+    "sample_flow_factor_model",
     "sample_gmm_factor_model",
     "sample_skew_t_factor_model",
     "window_stats",

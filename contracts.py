@@ -43,6 +43,24 @@ class SkewTParams:
 
 
 @dataclass(frozen=True)
+class FlowParams:
+    """Conditional-normalizing-flow factor-model parameters at the bottom level.
+
+    Same mu/sigma/F factor structure as `FactorParams`; `flow_w`/`flow_a`/`flow_b` are
+    the already-activated weight/slope/shift of a K_flow-unit deep sigmoidal flow (see
+    `sample_flow_factor_model`) that warps a standard-normal draw into the innovation's
+    learned shape, in place of a fixed parametric family like `SkewTParams`'s.
+    """
+
+    mu: Tensor  # [B, H, Nb]
+    sigma: Tensor  # [B, H, Nb]
+    flow_w: Tensor  # [B, H, Nb, K_flow], positive, sums to 1 along K_flow
+    flow_a: Tensor  # [B, H, Nb, K_flow], positive
+    flow_b: Tensor  # [B, H, Nb, K_flow]
+    F: Tensor  # [B, H, Nb, K]
+
+
+@dataclass(frozen=True)
 class GMMParams:
     """K-component Gaussian-mixture factor-model parameters at the bottom level.
 
@@ -116,6 +134,8 @@ class Decoder(Protocol):
 
 
 class Head(Protocol):
-    """[B, Nb, H, D'] -> FactorParams, SkewTParams or GMMParams."""
+    """[B, Nb, H, D'] -> FactorParams, SkewTParams, FlowParams or GMMParams."""
 
-    def __call__(self, z: Tensor) -> FactorParams | SkewTParams | GMMParams: ...
+    def __call__(
+        self, z: Tensor
+    ) -> FactorParams | SkewTParams | FlowParams | GMMParams: ...

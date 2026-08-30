@@ -166,6 +166,111 @@ def test_skew_t_shared_head_gradients_reach_every_parameter(S: np.ndarray) -> No
     assert not missing, f"no gradient reached {missing}"
 
 
+def test_flow_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="normalizing_flow"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    k_flow = model.head.n_flow_components
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.flow_w.shape == (B, H, model.n_bottom, k_flow)
+    assert params.flow_a.shape == (B, H, model.n_bottom, k_flow)
+    assert params.flow_b.shape == (B, H, model.n_bottom, k_flow)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.flow_a > model.head.a_floor).all()
+    torch.testing.assert_close(params.flow_w.sum(-1), torch.ones(B, H, model.n_bottom))
+
+
+def test_flow_head_rejects_fewer_than_one_component() -> None:
+    with pytest.raises(ValueError, match="n_flow_components must be >= 1"):
+        from model.heads import NormalizingFlowHead
+
+        NormalizingFlowHead(in_dim=4, n_factors=2, n_flow_components=0)
+
+
+def test_flow_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="normalizing_flow"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    total = (
+        params.mu.sum()
+        + params.sigma.sum()
+        + params.flow_w.sum()
+        + params.flow_a.sum()
+        + params.flow_b.sum()
+    )
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"
+
+
+def test_flow_shared_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="normalizing_flow_shared"),
+        dims,
+        S,
+    )
+    params = model(_batch(model.n_bottom))
+    k_flow = model.head.n_flow_components
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.flow_w.shape == (B, H, model.n_bottom, k_flow)
+    assert params.flow_a.shape == (B, H, model.n_bottom, k_flow)
+    assert params.flow_b.shape == (B, H, model.n_bottom, k_flow)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.flow_a > model.head.a_floor).all()
+    torch.testing.assert_close(params.flow_w.sum(-1), torch.ones(B, H, model.n_bottom))
+
+
+def test_flow_shared_head_flow_is_global() -> None:
+    """A single (w, a, b) flow broadcasts across every series and horizon."""
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="normalizing_flow_shared"),
+        dims,
+        np.eye(4, dtype=np.float32),
+    )
+    params = model(_batch(model.n_bottom))
+    for k in range(model.head.n_flow_components):
+        assert params.flow_w[..., k].unique().numel() == 1
+        assert params.flow_a[..., k].unique().numel() == 1
+        assert params.flow_b[..., k].unique().numel() == 1
+
+
+def test_flow_shared_head_rejects_fewer_than_one_component() -> None:
+    with pytest.raises(ValueError, match="n_flow_components must be >= 1"):
+        from model.heads import NormalizingFlowSharedHead
+
+        NormalizingFlowSharedHead(in_dim=4, n_factors=2, n_flow_components=0)
+
+
+def test_flow_shared_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="normalizing_flow_shared"),
+        dims,
+        S,
+    )
+    params = model(_batch(model.n_bottom))
+    total = (
+        params.mu.sum()
+        + params.sigma.sum()
+        + params.flow_w.sum()
+        + params.flow_a.sum()
+        + params.flow_b.sum()
+    )
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"
+
+
 def test_gmm_head_forward_shapes(S: np.ndarray) -> None:
     dims = ModelDims(h=H, input_size=L)
     model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="gmm"), dims, S)
