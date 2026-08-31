@@ -61,6 +61,52 @@ class FlowParams:
 
 
 @dataclass(frozen=True)
+class CopulaSplineParams:
+    """Gaussian-copula factor-model parameters with a learned per-series spline marginal.
+
+    The correlation structure comes from the same low-rank Gaussian factor model as
+    `FactorParams` (mu, sigma, F); `spline_w`/`spline_h`/`spline_d` are a monotonic
+    rational-quadratic spline (see `sample_copula_spline_factor_model`) applied to the
+    *entire* correlated Gaussian draw -- idiosyncratic noise and shared factor term
+    together -- rather than to the idiosyncratic part alone the way `FlowParams` does,
+    so the marginal's shape is learned without disturbing the copula's rank
+    correlation.
+    """
+
+    mu: Tensor  # [B, H, Nb]
+    sigma: Tensor  # [B, H, Nb]
+    spline_w: Tensor  # [B, H, Nb, n_bins], positive, sums to 1 along n_bins
+    spline_h: Tensor  # [B, H, Nb, n_bins], positive, sums to 1 along n_bins
+    spline_d: Tensor  # [B, H, Nb, n_bins-1], positive interior knot derivatives
+    F: Tensor  # [B, H, Nb, K]
+
+
+@dataclass(frozen=True)
+class CopulaFlowParams:
+    """Gaussian-copula factor-model parameters with a two-layer learned marginal.
+
+    Combines `CopulaSplineParams`'s correlation-preserving construction -- the
+    *whole* correlated draw `g = z + F @ eps`, standardized, is what gets warped,
+    never just the idiosyncratic part -- with a marginal built from two composed
+    monotonic layers instead of one: a rational-quadratic spline
+    (`spline_w`/`spline_h`/`spline_d`, as in `CopulaSplineParams`) followed by a
+    deep sigmoidal flow (`flow_w`/`flow_a`/`flow_b`, as in `FlowParams`). See
+    `sample_copula_flow_factor_model` for why composing them is safe and why the
+    copula's rank correlation survives both layers.
+    """
+
+    mu: Tensor  # [B, H, Nb]
+    sigma: Tensor  # [B, H, Nb]
+    spline_w: Tensor  # [B, H, Nb, n_bins], positive, sums to 1 along n_bins
+    spline_h: Tensor  # [B, H, Nb, n_bins], positive, sums to 1 along n_bins
+    spline_d: Tensor  # [B, H, Nb, n_bins-1], positive interior knot derivatives
+    flow_w: Tensor  # [B, H, Nb, K_flow], positive, sums to 1 along K_flow
+    flow_a: Tensor  # [B, H, Nb, K_flow], positive
+    flow_b: Tensor  # [B, H, Nb, K_flow]
+    F: Tensor  # [B, H, Nb, K]
+
+
+@dataclass(frozen=True)
 class GMMParams:
     """K-component Gaussian-mixture factor-model parameters at the bottom level.
 
@@ -134,8 +180,16 @@ class Decoder(Protocol):
 
 
 class Head(Protocol):
-    """[B, Nb, H, D'] -> FactorParams, SkewTParams, FlowParams or GMMParams."""
+    """[B, Nb, H, D'] -> FactorParams, SkewTParams, FlowParams, CopulaSplineParams,
+    CopulaFlowParams or GMMParams."""
 
     def __call__(
         self, z: Tensor
-    ) -> FactorParams | SkewTParams | FlowParams | GMMParams: ...
+    ) -> (
+        FactorParams
+        | SkewTParams
+        | FlowParams
+        | CopulaSplineParams
+        | CopulaFlowParams
+        | GMMParams
+    ): ...

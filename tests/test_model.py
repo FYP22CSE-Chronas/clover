@@ -101,9 +101,7 @@ def test_gradients_reach_every_parameter(model: CLOVER) -> None:
 
 def test_skew_t_head_forward_shapes(S: np.ndarray) -> None:
     dims = ModelDims(h=H, input_size=L)
-    model = CLOVER(
-        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t"), dims, S
-    )
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t"), dims, S)
     params = model(_batch(model.n_bottom))
     assert params.mu.shape == (B, H, model.n_bottom)
     assert params.sigma.shape == (B, H, model.n_bottom)
@@ -116,9 +114,7 @@ def test_skew_t_head_forward_shapes(S: np.ndarray) -> None:
 
 def test_skew_t_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
     dims = ModelDims(h=H, input_size=L)
-    model = CLOVER(
-        ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t"), dims, S
-    )
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="skew_t"), dims, S)
     params = model(_batch(model.n_bottom))
     total = params.mu.sum() + params.sigma.sum() + params.nu.sum() + params.lam.sum()
     (total + params.F.sum()).backward()
@@ -189,6 +185,41 @@ def test_flow_head_rejects_fewer_than_one_component() -> None:
         from model.heads import NormalizingFlowHead
 
         NormalizingFlowHead(in_dim=4, n_factors=2, n_flow_components=0)
+
+
+def test_model_config_n_flow_components_and_a_floor_reach_the_flow_head(
+    S: np.ndarray,
+) -> None:
+    """`ModelConfig.n_flow_components`/`flow_a_floor` are only consumed by heads
+    whose constructor declares them; CLOVER must filter, not pass unconditionally."""
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(
+            temp_conv_channels=6,
+            n_factors=3,
+            head="normalizing_flow",
+            n_flow_components=3,
+            flow_a_floor=0.25,
+        ),
+        dims,
+        S,
+    )
+    assert model.head.n_flow_components == 3
+    assert model.head.a_floor == 0.25
+    params = model(_batch(model.n_bottom))
+    assert params.flow_w.shape[-1] == 3
+
+
+def test_model_config_flow_fields_do_not_break_unrelated_heads(S: np.ndarray) -> None:
+    """A head that doesn't declare `n_flow_components`/`a_floor` (e.g. `gmm`) must
+    still build, ignoring those config fields rather than raising a TypeError."""
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="gmm", n_flow_components=99),
+        dims,
+        S,
+    )
+    assert model.head.n_components == 2
 
 
 def test_flow_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
@@ -262,6 +293,108 @@ def test_flow_shared_head_gradients_reach_every_parameter(S: np.ndarray) -> None
     total = (
         params.mu.sum()
         + params.sigma.sum()
+        + params.flow_w.sum()
+        + params.flow_a.sum()
+        + params.flow_b.sum()
+    )
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"
+
+
+def test_copula_spline_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="copula_spline"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    n_bins = model.head.n_spline_bins
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.spline_w.shape == (B, H, model.n_bottom, n_bins)
+    assert params.spline_h.shape == (B, H, model.n_bottom, n_bins)
+    assert params.spline_d.shape == (B, H, model.n_bottom, n_bins - 1)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.spline_d > model.head.slope_floor).all()
+    torch.testing.assert_close(params.spline_w.sum(-1), torch.ones(B, H, model.n_bottom))
+    torch.testing.assert_close(params.spline_h.sum(-1), torch.ones(B, H, model.n_bottom))
+
+
+def test_copula_spline_head_rejects_fewer_than_one_bin() -> None:
+    with pytest.raises(ValueError, match="n_spline_bins must be >= 1"):
+        from model.heads import CopulaSplineHead
+
+        CopulaSplineHead(in_dim=4, n_factors=2, n_spline_bins=0)
+
+
+def test_copula_spline_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="copula_spline"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    total = (
+        params.mu.sum()
+        + params.sigma.sum()
+        + params.spline_w.sum()
+        + params.spline_h.sum()
+        + params.spline_d.sum()
+    )
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"
+
+
+def test_copula_flow_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="copula_flow"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    n_bins, n_flow = model.head.n_spline_bins, model.head.n_flow_components
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.spline_w.shape == (B, H, model.n_bottom, n_bins)
+    assert params.spline_h.shape == (B, H, model.n_bottom, n_bins)
+    assert params.spline_d.shape == (B, H, model.n_bottom, n_bins - 1)
+    assert params.flow_w.shape == (B, H, model.n_bottom, n_flow)
+    assert params.flow_a.shape == (B, H, model.n_bottom, n_flow)
+    assert params.flow_b.shape == (B, H, model.n_bottom, n_flow)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.spline_d > model.head.slope_floor).all()
+    assert (params.flow_a > model.head.a_floor).all()
+    torch.testing.assert_close(params.spline_w.sum(-1), torch.ones(B, H, model.n_bottom))
+    torch.testing.assert_close(params.flow_w.sum(-1), torch.ones(B, H, model.n_bottom))
+
+
+def test_copula_flow_head_rejects_fewer_than_one_bin() -> None:
+    with pytest.raises(ValueError, match="n_spline_bins must be >= 1"):
+        from model.heads import CopulaFlowHead
+
+        CopulaFlowHead(in_dim=4, n_factors=2, n_spline_bins=0)
+
+
+def test_copula_flow_head_rejects_fewer_than_one_flow_component() -> None:
+    with pytest.raises(ValueError, match="n_flow_components must be >= 1"):
+        from model.heads import CopulaFlowHead
+
+        CopulaFlowHead(in_dim=4, n_factors=2, n_flow_components=0)
+
+
+def test_copula_flow_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, head="copula_flow"), dims, S
+    )
+    params = model(_batch(model.n_bottom))
+    total = (
+        params.mu.sum()
+        + params.sigma.sum()
+        + params.spline_w.sum()
+        + params.spline_h.sum()
+        + params.spline_d.sum()
         + params.flow_w.sum()
         + params.flow_a.sum()
         + params.flow_b.sum()

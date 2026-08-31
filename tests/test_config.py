@@ -92,6 +92,8 @@ def test_config_root_points_at_the_repo() -> None:
         ({"kernel_size": 0}, "kernel_size"),
         ({"n_factors": 0}, "n_factors"),
         ({"cross_series_hidden": -1}, "cross_series_hidden"),
+        ({"n_flow_components": 0}, "n_flow_components"),
+        ({"flow_a_floor": -1.0}, "flow_a_floor"),
     ],
 )
 def test_model_config_validation(kwargs: dict, match: str) -> None:

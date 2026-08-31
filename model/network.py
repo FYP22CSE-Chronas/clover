@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -75,12 +77,18 @@ class CLOVER(nn.Module):
             horizon_specific_dim=config.horizon_specific_dim,
             n_futr_features=dims.n_futr_features,
         )
-        self.head = HEADS.create(
-            config.head,
-            in_dim=self.decoder.out_dim,
-            n_factors=config.n_factors,
-            sigma_activation=config.sigma_activation,
-            sigma_eps=config.sigma_eps,
+        head_factory = HEADS.get(config.head)
+        candidate_kwargs = {
+            "in_dim": self.decoder.out_dim,
+            "n_factors": config.n_factors,
+            "sigma_activation": config.sigma_activation,
+            "sigma_eps": config.sigma_eps,
+            "n_flow_components": config.n_flow_components,
+            "a_floor": config.flow_a_floor,
+        }
+        accepted = inspect.signature(head_factory).parameters
+        self.head = head_factory(
+            **{k: v for k, v in candidate_kwargs.items() if k in accepted}
         )
 
     @property

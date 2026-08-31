@@ -5,7 +5,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from contracts import FactorParams, FlowParams, GMMParams, SkewTParams
+from contracts import (
+    CopulaFlowParams,
+    CopulaSplineParams,
+    FactorParams,
+    FlowParams,
+    GMMParams,
+    SkewTParams,
+)
 from model.blocks import MLPBlock
 from registry import Registry
 
@@ -211,6 +218,174 @@ class NormalizingFlowSharedHead(nn.Module):
             flow_w=flow_w.expand(shape),
             flow_a=flow_a.expand(shape),
             flow_b=flow_b.expand(shape),
+            F=loadings,
+        )
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
+def _spline_shape(
+    w_raw: Tensor, h_raw: Tensor, d_raw: Tensor, slope_floor: float
+) -> tuple[Tensor, Tensor, Tensor]:
+    """Activate a rational-quadratic spline's raw bin widths/heights/derivatives.
+
+    `softmax` keeps the bin widths and heights each a convex combination, so the
+    knot x- and y-positions they cumulative-sum into are strictly increasing;
+    `softplus(...) + slope_floor` floors every interior knot derivative above 0, the
+    same role `a_floor` plays for the normalizing-flow head's slopes.
+    """
+    widths = torch.softmax(w_raw, dim=-1)
+    heights = torch.softmax(h_raw, dim=-1)
+    derivatives = F.softplus(d_raw) + slope_floor
+    return widths, heights, derivatives
+
+
+@HEADS.register("copula_spline")
+class CopulaSplineHead(nn.Module):
+    """Emits 2 + 2*n_bins + (n_bins-1) + K values per (series, horizon): mu, raw
+    sigma, spline bin widths/heights, interior knot derivatives, and K loadings.
+
+    Builds a Gaussian-copula factor model -- the same mu/sigma/F structure as
+    `FactorModelHead` -- and warps the *whole* correlated draw through a learned,
+    monotonic rational-quadratic spline per series (see
+    `sample_copula_spline_factor_model`), rather than warping only the idiosyncratic
+    part the way `NormalizingFlowHead` does. Because a monotonic transform never
+    changes rank correlation, this reshapes each series' marginal without disturbing
+    the correlation structure the factor loadings encode -- the defining property of
+    a copula, and a stricter guarantee than `NormalizingFlowHead` gives.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_spline_bins: int = 8,
+        slope_floor: float = 1e-3,
+    ) -> None:
+        super().__init__()
+        if n_spline_bins < 1:
+            raise ValueError(f"n_spline_bins must be >= 1, got {n_spline_bins}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_spline_bins = n_spline_bins
+        self.slope_floor = slope_floor
+        n_deriv = max(n_spline_bins - 1, 0)
+        self.proj = MLPBlock(in_dim, 2 + 2 * n_spline_bins + n_deriv + n_factors)
+
+    def forward(self, z: Tensor) -> CopulaSplineParams:
+        """[B,Nb,H,D] -> mu/sigma [B,H,Nb], spline params/loadings [B,H,Nb,*]."""
+        b = self.n_spline_bins
+        n_deriv = max(b - 1, 0)
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+        w_raw = params[..., 2 : 2 + b].permute(0, 2, 1, 3)
+        h_raw = params[..., 2 + b : 2 + 2 * b].permute(0, 2, 1, 3)
+        d_raw = params[..., 2 + 2 * b : 2 + 2 * b + n_deriv].permute(0, 2, 1, 3)
+        loadings = params[..., 2 + 2 * b + n_deriv :].permute(0, 2, 1, 3)
+        widths, heights, derivatives = _spline_shape(
+            w_raw, h_raw, d_raw, self.slope_floor
+        )
+        return CopulaSplineParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            spline_w=widths,
+            spline_h=heights,
+            spline_d=derivatives,
+            F=loadings,
+        )
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
+@HEADS.register("copula_flow")
+class CopulaFlowHead(nn.Module):
+    """Emits 2 + 2*n_bins + (n_bins-1) + 3*n_flow_components + K values per
+    (series, horizon): mu, raw sigma, spline bin widths/heights/derivatives, flow
+    weight/slope/shift, and K loadings.
+
+    Combines `CopulaSplineHead`'s copula-correct construction -- the whole
+    correlated draw gets warped, never just the idiosyncratic part -- with a
+    marginal built from two composed monotonic layers, a rational-quadratic spline
+    then a deep sigmoidal flow, instead of either family alone. See
+    `sample_copula_flow_factor_model`.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_spline_bins: int = 8,
+        slope_floor: float = 1e-3,
+        n_flow_components: int = 8,
+        a_floor: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if n_spline_bins < 1:
+            raise ValueError(f"n_spline_bins must be >= 1, got {n_spline_bins}")
+        if n_flow_components < 1:
+            raise ValueError(f"n_flow_components must be >= 1, got {n_flow_components}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_spline_bins = n_spline_bins
+        self.slope_floor = slope_floor
+        self.n_flow_components = n_flow_components
+        self.a_floor = a_floor
+        n_deriv = max(n_spline_bins - 1, 0)
+        spline_dim = 2 * n_spline_bins + n_deriv
+        flow_dim = 3 * n_flow_components
+        self.proj = MLPBlock(in_dim, 2 + spline_dim + flow_dim + n_factors)
+
+    def forward(self, z: Tensor) -> CopulaFlowParams:
+        """[B,Nb,H,D] -> mu/sigma [B,H,Nb], spline+flow params, loadings [B,H,Nb,*]."""
+        b, k = self.n_spline_bins, self.n_flow_components
+        n_deriv = max(b - 1, 0)
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+
+        i = 2
+        w_raw = params[..., i : i + b].permute(0, 2, 1, 3)
+        i += b
+        h_raw = params[..., i : i + b].permute(0, 2, 1, 3)
+        i += b
+        d_raw = params[..., i : i + n_deriv].permute(0, 2, 1, 3)
+        i += n_deriv
+        flow_w_raw = params[..., i : i + k].permute(0, 2, 1, 3)
+        i += k
+        flow_a_raw = params[..., i : i + k].permute(0, 2, 1, 3)
+        i += k
+        flow_b = params[..., i : i + k].permute(0, 2, 1, 3)
+        i += k
+        loadings = params[..., i:].permute(0, 2, 1, 3)
+
+        widths, heights, derivatives = _spline_shape(
+            w_raw, h_raw, d_raw, self.slope_floor
+        )
+        flow_w, flow_a, flow_b = _flow_shape(flow_w_raw, flow_a_raw, flow_b, self.a_floor)
+        return CopulaFlowParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            spline_w=widths,
+            spline_h=heights,
+            spline_d=derivatives,
+            flow_w=flow_w,
+            flow_a=flow_a,
+            flow_b=flow_b,
             F=loadings,
         )
 

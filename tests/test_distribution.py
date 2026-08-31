@@ -4,12 +4,22 @@ import numpy as np
 import pytest
 import torch
 
-from contracts import FactorParams, FlowParams, GMMParams, SkewTParams
+from contracts import (
+    CopulaFlowParams,
+    CopulaSplineParams,
+    FactorParams,
+    FlowParams,
+    GMMParams,
+    SkewTParams,
+)
 from model.distribution import (
     _dsf_transform,
+    _rational_quadratic_spline,
     aggregate_targets,
     coherent_aggregate,
     sample_coherent,
+    sample_copula_flow_factor_model,
+    sample_copula_spline_factor_model,
     sample_factor_model,
     sample_flow_factor_model,
     sample_gmm_factor_model,
@@ -233,6 +243,236 @@ def test_dsf_transform_is_strictly_increasing() -> None:
     b = torch.randn(1, 1, 1, 6)
     t = _dsf_transform(grid, w, a, b)
     assert (t.diff(dim=-1) > 0).all()
+
+
+K_BINS = 4
+
+
+def _copula_spline_params(n_bottom: int) -> CopulaSplineParams:
+    return CopulaSplineParams(
+        mu=torch.randn(B, H, n_bottom),
+        sigma=torch.rand(B, H, n_bottom) + 0.1,
+        spline_w=torch.softmax(torch.randn(B, H, n_bottom, K_BINS), dim=-1),
+        spline_h=torch.softmax(torch.randn(B, H, n_bottom, K_BINS), dim=-1),
+        spline_d=torch.rand(B, H, n_bottom, K_BINS - 1) + 0.1,
+        F=torch.randn(B, H, n_bottom, K) * 0.1,
+    )
+
+
+def test_copula_spline_sample_shape(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    samples = sample_copula_spline_factor_model(
+        _copula_spline_params(n_bottom), num_samples=16
+    )
+    assert samples.shape == (B, H, n_bottom, 16)
+
+
+def test_copula_spline_samples_are_coherent(S: np.ndarray) -> None:
+    S_t = torch.as_tensor(S)
+    draws = sample_coherent(_copula_spline_params(S.shape[1]), S_t, num_samples=32)
+    expected = torch.einsum("ij,bhjn->bhin", S_t, torch.relu(draws.bottom))
+    torch.testing.assert_close(draws.hierarchy, expected)
+
+
+def test_copula_spline_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
+    params = _copula_spline_params(S.shape[1])
+    a = sample_copula_spline_factor_model(
+        params, 8, generator=torch.Generator().manual_seed(7)
+    )
+    b = sample_copula_spline_factor_model(
+        params, 8, generator=torch.Generator().manual_seed(7)
+    )
+    torch.testing.assert_close(a, b)
+
+
+def test_copula_spline_rejects_mismatched_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _copula_spline_params(n_bottom)
+    bad = CopulaSplineParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        spline_w=params.spline_w,
+        spline_h=params.spline_h[..., :-1],
+        spline_d=params.spline_d,
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="differ"):
+        sample_copula_spline_factor_model(bad, num_samples=4)
+
+
+def test_copula_spline_rejects_wrong_derivative_count(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _copula_spline_params(n_bottom)
+    bad = CopulaSplineParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        spline_w=params.spline_w,
+        spline_h=params.spline_h,
+        spline_d=params.spline_d[..., :-1],
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="interior derivatives"):
+        sample_copula_spline_factor_model(bad, num_samples=4)
+
+
+def test_rqs_single_bin_is_identity() -> None:
+    """softmax over a single bin always gives width=height=2*tail_bound, and the
+    fixed boundary derivatives of 1 make a lone bin an exact identity map."""
+    torch.manual_seed(0)
+    x = torch.randn(2, 3, 4, 5) * 3.0
+    w = torch.softmax(torch.randn(2, 3, 4, 1), dim=-1)
+    h = torch.softmax(torch.randn(2, 3, 4, 1), dim=-1)
+    d = torch.zeros(2, 3, 4, 0)
+    y = _rational_quadratic_spline(x, w, h, d, tail_bound=4.0)
+    torch.testing.assert_close(y, x, atol=1e-5, rtol=1e-5)
+
+
+def test_rqs_is_strictly_increasing_including_the_tails() -> None:
+    torch.manual_seed(0)
+    grid = torch.linspace(-6.0, 6.0, 400).reshape(1, 1, 1, 400)
+    w = torch.softmax(torch.randn(1, 1, 1, 6), dim=-1)
+    h = torch.softmax(torch.randn(1, 1, 1, 6), dim=-1)
+    d = torch.rand(1, 1, 1, 5) + 0.3
+    y = _rational_quadratic_spline(grid, w, h, d, tail_bound=4.0)
+    assert (y.diff(dim=-1) >= 0).all()
+
+
+def test_copula_spline_preserves_gaussian_factor_models_rank_correlation() -> None:
+    """The point of a copula construction: reusing the same underlying `z`/`eps`
+    draws, each series' own sample order survives the spline warp, so any rank-based
+    correlation between series (e.g. Spearman's rho) that the Gaussian factor model
+    induces carries over exactly after reshaping the marginals."""
+    n_bottom = 3
+    mu, sigma = torch.zeros(1, 1, n_bottom), torch.ones(1, 1, n_bottom)
+    loadings = torch.randn(1, 1, n_bottom, 2) * 0.5
+    gaussian_params = FactorParams(mu=mu, sigma=sigma, F=loadings)
+    copula_params = CopulaSplineParams(
+        mu=mu,
+        sigma=sigma,
+        spline_w=torch.softmax(torch.randn(1, 1, n_bottom, 5), dim=-1),
+        spline_h=torch.softmax(torch.randn(1, 1, n_bottom, 5), dim=-1),
+        spline_d=torch.rand(1, 1, n_bottom, 4) + 0.3,
+        F=loadings,
+    )
+    gaussian = sample_factor_model(
+        gaussian_params, 500, generator=torch.Generator().manual_seed(3)
+    )
+    copula = sample_copula_spline_factor_model(
+        copula_params, 500, generator=torch.Generator().manual_seed(3)
+    )
+    for i in range(n_bottom):
+        mismatches = (
+            torch.argsort(gaussian[0, 0, i]) != torch.argsort(copula[0, 0, i])
+        ).sum()
+        assert mismatches <= 4, f"series {i}: {mismatches} rank mismatches"
+
+
+def _copula_flow_params(n_bottom: int) -> CopulaFlowParams:
+    return CopulaFlowParams(
+        mu=torch.randn(B, H, n_bottom),
+        sigma=torch.rand(B, H, n_bottom) + 0.1,
+        spline_w=torch.softmax(torch.randn(B, H, n_bottom, K_BINS), dim=-1),
+        spline_h=torch.softmax(torch.randn(B, H, n_bottom, K_BINS), dim=-1),
+        spline_d=torch.rand(B, H, n_bottom, K_BINS - 1) + 0.1,
+        flow_w=torch.softmax(torch.randn(B, H, n_bottom, K_BINS), dim=-1),
+        flow_a=torch.rand(B, H, n_bottom, K_BINS) + 0.1,
+        flow_b=torch.randn(B, H, n_bottom, K_BINS),
+        F=torch.randn(B, H, n_bottom, K) * 0.1,
+    )
+
+
+def test_copula_flow_sample_shape(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    samples = sample_copula_flow_factor_model(
+        _copula_flow_params(n_bottom), num_samples=16
+    )
+    assert samples.shape == (B, H, n_bottom, 16)
+
+
+def test_copula_flow_samples_are_coherent(S: np.ndarray) -> None:
+    S_t = torch.as_tensor(S)
+    draws = sample_coherent(_copula_flow_params(S.shape[1]), S_t, num_samples=32)
+    expected = torch.einsum("ij,bhjn->bhin", S_t, torch.relu(draws.bottom))
+    torch.testing.assert_close(draws.hierarchy, expected)
+
+
+def test_copula_flow_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
+    params = _copula_flow_params(S.shape[1])
+    a = sample_copula_flow_factor_model(
+        params, 8, generator=torch.Generator().manual_seed(7)
+    )
+    b = sample_copula_flow_factor_model(
+        params, 8, generator=torch.Generator().manual_seed(7)
+    )
+    torch.testing.assert_close(a, b)
+
+
+def test_copula_flow_rejects_mismatched_spline_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _copula_flow_params(n_bottom)
+    bad = CopulaFlowParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        spline_w=params.spline_w,
+        spline_h=params.spline_h[..., :-1],
+        spline_d=params.spline_d,
+        flow_w=params.flow_w,
+        flow_a=params.flow_a,
+        flow_b=params.flow_b,
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="differ"):
+        sample_copula_flow_factor_model(bad, num_samples=4)
+
+
+def test_copula_flow_rejects_mismatched_flow_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _copula_flow_params(n_bottom)
+    bad = CopulaFlowParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        spline_w=params.spline_w,
+        spline_h=params.spline_h,
+        spline_d=params.spline_d,
+        flow_w=params.flow_w[..., :-1],
+        flow_a=params.flow_a,
+        flow_b=params.flow_b,
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="must all match"):
+        sample_copula_flow_factor_model(bad, num_samples=4)
+
+
+def test_copula_flow_preserves_gaussian_factor_models_rank_correlation() -> None:
+    """A composition of two strictly increasing functions (spline then flow) is
+    itself strictly increasing, so the copula's rank correlation survives both
+    layers exactly, the same guarantee `CopulaSplineParams` gives with just one."""
+    n_bottom = 3
+    mu, sigma = torch.zeros(1, 1, n_bottom), torch.ones(1, 1, n_bottom)
+    loadings = torch.randn(1, 1, n_bottom, 2) * 0.5
+    gaussian_params = FactorParams(mu=mu, sigma=sigma, F=loadings)
+    copula_flow_params = CopulaFlowParams(
+        mu=mu,
+        sigma=sigma,
+        spline_w=torch.softmax(torch.randn(1, 1, n_bottom, 5), dim=-1),
+        spline_h=torch.softmax(torch.randn(1, 1, n_bottom, 5), dim=-1),
+        spline_d=torch.rand(1, 1, n_bottom, 4) + 0.3,
+        flow_w=torch.softmax(torch.randn(1, 1, n_bottom, 5), dim=-1),
+        flow_a=torch.rand(1, 1, n_bottom, 5) + 0.3,
+        flow_b=torch.randn(1, 1, n_bottom, 5),
+        F=loadings,
+    )
+    gaussian = sample_factor_model(
+        gaussian_params, 500, generator=torch.Generator().manual_seed(3)
+    )
+    combo = sample_copula_flow_factor_model(
+        copula_flow_params, 500, generator=torch.Generator().manual_seed(3)
+    )
+    for i in range(n_bottom):
+        mismatches = (
+            torch.argsort(gaussian[0, 0, i]) != torch.argsort(combo[0, 0, i])
+        ).sum()
+        assert mismatches <= 4, f"series {i}: {mismatches} rank mismatches"
 
 
 N_COMPONENTS = 2

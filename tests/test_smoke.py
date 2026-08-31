@@ -104,6 +104,28 @@ def test_normalizing_flow_shared_head_end_to_end_run_produces_finite_scores() ->
     assert result.history.steps_run == QUICK["max_steps"]
 
 
+def test_copula_spline_head_end_to_end_run_produces_finite_scores() -> None:
+    """The Gaussian-copula spline-marginal head trains through the same pipeline as
+    the default."""
+    config = quick("tourism_small")
+    config = replace(config, model=replace(config.model, head="copula_spline"))
+    result = run(config, seed=0, verbose=False)
+    assert set(result.scrps) >= {"Overall"}
+    assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
+    assert result.history.steps_run == QUICK["max_steps"]
+
+
+def test_copula_flow_head_end_to_end_run_produces_finite_scores() -> None:
+    """The copula spline-then-flow head trains through the same pipeline as the
+    default."""
+    config = quick("tourism_small")
+    config = replace(config, model=replace(config.model, head="copula_flow"))
+    result = run(config, seed=0, verbose=False)
+    assert set(result.scrps) >= {"Overall"}
+    assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
+    assert result.history.steps_run == QUICK["max_steps"]
+
+
 def test_gmm_head_end_to_end_run_produces_finite_scores() -> None:
     """The Gaussian-mixture head trains through the same pipeline as the default."""
     config = quick("tourism_small")

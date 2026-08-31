@@ -3,7 +3,14 @@ from __future__ import annotations
 import pytest
 import torch
 
-from contracts import FactorParams, FlowParams, GMMParams, SkewTParams
+from contracts import (
+    CopulaFlowParams,
+    CopulaSplineParams,
+    FactorParams,
+    FlowParams,
+    GMMParams,
+    SkewTParams,
+)
 from model.normalization import (
     SCALERS,
     denormalize,
@@ -110,6 +117,56 @@ def test_denormalize_flow_params_scales_shape_free_terms() -> None:
     raw = denormalize_params(params, stats)
     torch.testing.assert_close(raw.mu, params.mu * stats.scale + stats.loc)
     torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
+    torch.testing.assert_close(raw.flow_w, params.flow_w)
+    torch.testing.assert_close(raw.flow_a, params.flow_a)
+    torch.testing.assert_close(raw.flow_b, params.flow_b)
+    torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
+
+
+def test_denormalize_copula_spline_params_scales_shape_free_terms() -> None:
+    """mu/sigma/F scale affinely; the spline parameters are scale-free and pass
+    through."""
+    torch.manual_seed(0)
+    stats = window_stats(torch.rand(1, L, N) * 20 + 5, "standard")
+    params = CopulaSplineParams(
+        mu=torch.randn(1, 4, N),
+        sigma=torch.rand(1, 4, N) + 0.1,
+        spline_w=torch.softmax(torch.randn(1, 4, N, 5), dim=-1),
+        spline_h=torch.softmax(torch.randn(1, 4, N, 5), dim=-1),
+        spline_d=torch.rand(1, 4, N, 4) + 0.1,
+        F=torch.randn(1, 4, N, 2),
+    )
+    raw = denormalize_params(params, stats)
+    torch.testing.assert_close(raw.mu, params.mu * stats.scale + stats.loc)
+    torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
+    torch.testing.assert_close(raw.spline_w, params.spline_w)
+    torch.testing.assert_close(raw.spline_h, params.spline_h)
+    torch.testing.assert_close(raw.spline_d, params.spline_d)
+    torch.testing.assert_close(raw.F, params.F * stats.scale.unsqueeze(-1))
+
+
+def test_denormalize_copula_flow_params_scales_shape_free_terms() -> None:
+    """mu/sigma/F scale affinely; the spline and flow parameters are scale-free and
+    pass through."""
+    torch.manual_seed(0)
+    stats = window_stats(torch.rand(1, L, N) * 20 + 5, "standard")
+    params = CopulaFlowParams(
+        mu=torch.randn(1, 4, N),
+        sigma=torch.rand(1, 4, N) + 0.1,
+        spline_w=torch.softmax(torch.randn(1, 4, N, 5), dim=-1),
+        spline_h=torch.softmax(torch.randn(1, 4, N, 5), dim=-1),
+        spline_d=torch.rand(1, 4, N, 4) + 0.1,
+        flow_w=torch.softmax(torch.randn(1, 4, N, 3), dim=-1),
+        flow_a=torch.rand(1, 4, N, 3) + 0.1,
+        flow_b=torch.randn(1, 4, N, 3),
+        F=torch.randn(1, 4, N, 2),
+    )
+    raw = denormalize_params(params, stats)
+    torch.testing.assert_close(raw.mu, params.mu * stats.scale + stats.loc)
+    torch.testing.assert_close(raw.sigma, params.sigma * stats.scale)
+    torch.testing.assert_close(raw.spline_w, params.spline_w)
+    torch.testing.assert_close(raw.spline_h, params.spline_h)
+    torch.testing.assert_close(raw.spline_d, params.spline_d)
     torch.testing.assert_close(raw.flow_w, params.flow_w)
     torch.testing.assert_close(raw.flow_a, params.flow_a)
     torch.testing.assert_close(raw.flow_b, params.flow_b)

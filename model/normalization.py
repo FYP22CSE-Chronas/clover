@@ -5,7 +5,15 @@ from typing import Protocol
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, FlowParams, GMMParams, ScaleStats, SkewTParams
+from contracts import (
+    CopulaFlowParams,
+    CopulaSplineParams,
+    FactorParams,
+    FlowParams,
+    GMMParams,
+    ScaleStats,
+    SkewTParams,
+)
 from registry import Registry
 
 EPS = 1e-6
@@ -86,13 +94,30 @@ def denormalize(x: Tensor, stats: ScaleStats) -> Tensor:
 
 
 def denormalize_params(
-    params: FactorParams | SkewTParams | FlowParams | GMMParams, stats: ScaleStats
-) -> FactorParams | SkewTParams | FlowParams | GMMParams:
+    params: (
+        FactorParams
+        | SkewTParams
+        | FlowParams
+        | CopulaSplineParams
+        | CopulaFlowParams
+        | GMMParams
+    ),
+    stats: ScaleStats,
+) -> (
+    FactorParams
+    | SkewTParams
+    | FlowParams
+    | CopulaSplineParams
+    | CopulaFlowParams
+    | GMMParams
+):
     """Push (loc, scale) back onto mu/sigma/F so samples land in raw units.
 
     Every factor model is affine in mu/sigma/F, so this inverse is exact. A skew-t's
-    `nu`/`lam`, a flow's `flow_w`/`flow_a`/`flow_b`, and a mixture's `logits` are
-    scale-free and pass through unchanged.
+    `nu`/`lam`, a flow's `flow_w`/`flow_a`/`flow_b`, a copula spline's or copula
+    flow's `spline_w`/`spline_h`/`spline_d` (and, for the latter, `flow_w`/`flow_a`/
+    `flow_b` too), and a mixture's `logits` are scale-free and pass through
+    unchanged.
     """
     if isinstance(params, SkewTParams):
         return SkewTParams(
@@ -109,6 +134,27 @@ def denormalize_params(
             flow_w=params.flow_w,
             flow_a=params.flow_a,
             flow_b=params.flow_b,
+            F=params.F * stats.scale.unsqueeze(-1),
+        )
+    if isinstance(params, CopulaFlowParams):
+        return CopulaFlowParams(
+            mu=params.mu * stats.scale + stats.loc,
+            sigma=params.sigma * stats.scale,
+            spline_w=params.spline_w,
+            spline_h=params.spline_h,
+            spline_d=params.spline_d,
+            flow_w=params.flow_w,
+            flow_a=params.flow_a,
+            flow_b=params.flow_b,
+            F=params.F * stats.scale.unsqueeze(-1),
+        )
+    if isinstance(params, CopulaSplineParams):
+        return CopulaSplineParams(
+            mu=params.mu * stats.scale + stats.loc,
+            sigma=params.sigma * stats.scale,
+            spline_w=params.spline_w,
+            spline_h=params.spline_h,
+            spline_d=params.spline_d,
             F=params.F * stats.scale.unsqueeze(-1),
         )
     if isinstance(params, GMMParams):

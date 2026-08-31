@@ -3,7 +3,15 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-from contracts import FactorParams, FlowParams, ForecastSamples, GMMParams, SkewTParams
+from contracts import (
+    CopulaFlowParams,
+    CopulaSplineParams,
+    FactorParams,
+    FlowParams,
+    ForecastSamples,
+    GMMParams,
+    SkewTParams,
+)
 
 
 def sample_factor_model(
@@ -142,6 +150,173 @@ def sample_flow_factor_model(
     return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * t + factor_term
 
 
+def _rational_quadratic_spline(
+    x: Tensor, widths: Tensor, heights: Tensor, derivatives: Tensor, tail_bound: float
+) -> Tensor:
+    """Monotonic rational-quadratic spline (Durkan et al. 2019), identity beyond
+    +/-`tail_bound`.
+
+    `widths`/`heights` are convex combinations (positive, summing to 1 along the
+    trailing bin axis, already activated by the caller -- see
+    `model.heads._spline_shape`) giving the knot x- and y-positions inside
+    [-tail_bound, tail_bound]; `derivatives` holds the *interior* knot slopes
+    (positive, one fewer than there are bins). The two boundary knot derivatives are
+    fixed to 1 so the spline matches its identity tails with a continuous first
+    derivative -- a strictly increasing curve inside the bound, gluing smoothly onto
+    strictly increasing linear tails outside it, hence invertible everywhere (only
+    the forward direction is evaluated; see `_dsf_transform` for why). `x` carries no
+    trailing bin axis; `widths`/`heights`/`derivatives` do.
+    """
+    zeros = torch.zeros_like(widths[..., :1])
+    cumwidths = tail_bound * (2.0 * torch.cat([zeros, widths.cumsum(-1)], dim=-1) - 1.0)
+    cumheights = tail_bound * (2.0 * torch.cat([zeros, heights.cumsum(-1)], dim=-1) - 1.0)
+    ones = torch.ones(
+        *derivatives.shape[:-1], 1, device=derivatives.device, dtype=derivatives.dtype
+    )
+    full_derivatives = torch.cat([ones, derivatives, ones], dim=-1)
+
+    inside = (x >= -tail_bound) & (x <= tail_bound)
+    x_safe = x.clamp(-tail_bound, tail_bound)
+    bin_idx = (
+        torch.searchsorted(cumwidths.contiguous(), x_safe.contiguous(), right=True) - 1
+    )
+    bin_idx = bin_idx.clamp(0, widths.shape[-1] - 1)
+
+    def gather(t: Tensor, idx: Tensor) -> Tensor:
+        return torch.gather(t, dim=-1, index=idx)
+
+    x_lo, x_hi = gather(cumwidths, bin_idx), gather(cumwidths, bin_idx + 1)
+    y_lo, y_hi = gather(cumheights, bin_idx), gather(cumheights, bin_idx + 1)
+    s_k, s_k1 = gather(full_derivatives, bin_idx), gather(full_derivatives, bin_idx + 1)
+    w_k, h_k = x_hi - x_lo, y_hi - y_lo
+
+    xi = (x_safe - x_lo) / w_k
+    delta = h_k / w_k
+    numerator = h_k * (delta * xi**2 + s_k * xi * (1.0 - xi))
+    denominator = delta + (s_k1 + s_k - 2.0 * delta) * xi * (1.0 - xi)
+    y_inside = y_lo + numerator / denominator
+    return torch.where(inside, y_inside, x)
+
+
+def sample_copula_spline_factor_model(
+    params: CopulaSplineParams,
+    num_samples: int,
+    generator: torch.Generator | None = None,
+    tail_bound: float = 4.0,
+) -> Tensor:
+    """Draw `mu + sigma * t`, `t` a learned-marginal transform of a Gaussian-copula draw.
+
+    Builds the same correlated Gaussian `g = z + F @ eps` as `sample_factor_model`,
+    standardizes each series to unit variance, then warps it elementwise through a
+    monotonic rational-quadratic spline (see `_rational_quadratic_spline`). Because
+    the spline is applied to the *whole* correlated variable rather than to the
+    idiosyncratic term alone the way `sample_flow_factor_model` does, it reshapes
+    each series' marginal without disturbing the rank correlation the factor
+    structure induces -- the defining property of a copula construction.
+    Reparameterized through `z`/`eps` exactly like `sample_factor_model`, so
+    `generator` reproduces draws and gradients reach every spline and factor
+    parameter.
+    """
+    mu, sigma, loadings = params.mu, params.sigma, params.F
+    widths, heights, derivatives = params.spline_w, params.spline_h, params.spline_d
+    if mu.shape != sigma.shape:
+        raise ValueError(f"mu {tuple(mu.shape)} and sigma {tuple(sigma.shape)} differ")
+    if widths.shape != heights.shape:
+        raise ValueError(
+            f"spline_w {tuple(widths.shape)} and spline_h {tuple(heights.shape)} differ"
+        )
+    if widths.shape[-1] != derivatives.shape[-1] + 1:
+        raise ValueError(
+            f"spline_d must hold {widths.shape[-1] - 1} interior derivatives for "
+            f"{widths.shape[-1]} bins; got {tuple(derivatives.shape)}"
+        )
+    if widths.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"spline parameter leading dims {tuple(widths.shape[:-1])} must match mu "
+            f"{tuple(mu.shape)}"
+        )
+    if loadings.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"F leading dims {tuple(loadings.shape[:-1])} must match mu {tuple(mu.shape)}"
+        )
+    lead, n_bottom = mu.shape[:-1], mu.shape[-1]
+    n_factors = loadings.shape[-1]
+    kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
+
+    z = torch.randn(*lead, n_bottom, num_samples, **kw)
+    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
+    g = z + factor_term
+    g_std = (1.0 + (loadings**2).sum(-1)).sqrt().unsqueeze(-1)
+    t = _rational_quadratic_spline(g / g_std, widths, heights, derivatives, tail_bound)
+
+    return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * t
+
+
+def sample_copula_flow_factor_model(
+    params: CopulaFlowParams,
+    num_samples: int,
+    generator: torch.Generator | None = None,
+    tail_bound: float = 4.0,
+) -> Tensor:
+    """Draw `mu + sigma * t`, `t` a two-layer learned-marginal transform of a
+    Gaussian-copula draw.
+
+    Builds the same correlated, standardized Gaussian `g / g_std` as
+    `sample_copula_spline_factor_model`, then composes two monotonic layers:
+    `_rational_quadratic_spline` first -- its `[-tail_bound, tail_bound]` domain
+    matches the standardized draw exactly as it does in `sample_copula_spline_
+    factor_model` -- then `_dsf_transform`, which has no domain restriction at all
+    and saturates gracefully on whatever range the spline layer happens to produce.
+    Both layers reuse `sample_flow_factor_model` and `sample_copula_spline_factor_
+    model`'s own transforms unmodified. Stacking two different monotonic families
+    gives the marginal more shape than either alone; a composition of strictly
+    increasing functions is itself strictly increasing, so the copula's rank
+    correlation is preserved exactly through both layers.
+    """
+    mu, sigma, loadings = params.mu, params.sigma, params.F
+    s_w, s_h, s_d = params.spline_w, params.spline_h, params.spline_d
+    f_w, f_a, f_b = params.flow_w, params.flow_a, params.flow_b
+    if mu.shape != sigma.shape:
+        raise ValueError(f"mu {tuple(mu.shape)} and sigma {tuple(sigma.shape)} differ")
+    if s_w.shape != s_h.shape:
+        raise ValueError(
+            f"spline_w {tuple(s_w.shape)} and spline_h {tuple(s_h.shape)} differ"
+        )
+    if s_w.shape[-1] != s_d.shape[-1] + 1:
+        raise ValueError(
+            f"spline_d must hold {s_w.shape[-1] - 1} interior derivatives for "
+            f"{s_w.shape[-1]} bins; got {tuple(s_d.shape)}"
+        )
+    if not (f_w.shape == f_a.shape == f_b.shape):
+        raise ValueError(
+            f"flow_w {tuple(f_w.shape)}, flow_a {tuple(f_a.shape)} and flow_b "
+            f"{tuple(f_b.shape)} must all match"
+        )
+    if s_w.shape[:-1] != mu.shape or f_w.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"spline leading dims {tuple(s_w.shape[:-1])} and flow leading dims "
+            f"{tuple(f_w.shape[:-1])} must both match mu {tuple(mu.shape)}"
+        )
+    if loadings.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"F leading dims {tuple(loadings.shape[:-1])} must match mu {tuple(mu.shape)}"
+        )
+    lead, n_bottom = mu.shape[:-1], mu.shape[-1]
+    n_factors = loadings.shape[-1]
+    kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
+
+    z = torch.randn(*lead, n_bottom, num_samples, **kw)
+    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
+    g = z + factor_term
+    g_std = (1.0 + (loadings**2).sum(-1)).sqrt().unsqueeze(-1)
+    u = _rational_quadratic_spline(g / g_std, s_w, s_h, s_d, tail_bound)
+    t = _dsf_transform(u, f_w, f_a, f_b)
+
+    return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * t
+
+
 def sample_gmm_factor_model(
     params: GMMParams,
     num_samples: int,
@@ -201,7 +376,14 @@ def coherent_aggregate(S: Tensor, bottom: Tensor, clip: bool = True) -> Tensor:
 
 
 def sample_coherent(
-    params: FactorParams | SkewTParams | FlowParams | GMMParams,
+    params: (
+        FactorParams
+        | SkewTParams
+        | FlowParams
+        | CopulaSplineParams
+        | CopulaFlowParams
+        | GMMParams
+    ),
     S: Tensor,
     num_samples: int,
     generator: torch.Generator | None = None,
@@ -211,12 +393,18 @@ def sample_coherent(
 
     Dispatches on `params`' type: `FactorParams` draws Gaussian factor-model
     samples, `SkewTParams` draws skew-t samples, `FlowParams` draws normalizing-
-    flow samples, `GMMParams` draws Gaussian-mixture samples.
+    flow samples, `CopulaSplineParams` draws Gaussian-copula spline-marginal
+    samples, `CopulaFlowParams` draws Gaussian-copula spline-then-flow samples,
+    `GMMParams` draws Gaussian-mixture samples.
     """
     if isinstance(params, SkewTParams):
         sampler = sample_skew_t_factor_model
     elif isinstance(params, FlowParams):
         sampler = sample_flow_factor_model
+    elif isinstance(params, CopulaFlowParams):
+        sampler = sample_copula_flow_factor_model
+    elif isinstance(params, CopulaSplineParams):
+        sampler = sample_copula_spline_factor_model
     elif isinstance(params, GMMParams):
         sampler = sample_gmm_factor_model
     else:

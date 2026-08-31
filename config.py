@@ -56,6 +56,11 @@ class ModelConfig:
     mixer: str = "cross_series_mlp"
     decoder: str = "two_stage"
     head: str = "factor_model"
+    # Only consumed by heads whose constructor declares them (normalizing_flow,
+    # normalizing_flow_shared, copula_flow) -- see CLOVER._head_kwargs. Every other
+    # head keeps its own class default.
+    n_flow_components: int = 8
+    flow_a_floor: float = 0.1
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dilations", tuple(self.dilations))
@@ -72,6 +77,10 @@ class ModelConfig:
             raise ValueError("n_factors must be >= 1")
         if self.cross_series_hidden < 0:
             raise ValueError("cross_series_hidden must be >= 0 (0 disables the mixer)")
+        if self.n_flow_components < 1:
+            raise ValueError("n_flow_components must be >= 1")
+        if self.flow_a_floor < 0:
+            raise ValueError("flow_a_floor must be >= 0")
 
     @property
     def receptive_field(self) -> int:
