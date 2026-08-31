@@ -12,6 +12,7 @@ dependencies = ["torch>=2.0", "numpy>=1.24", "pandas>=2.0", "pyyaml>=6.0"]
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "ruff>=0.5"]
 favorita = ["pyarrow>=14.0"]
+ec_clover = ["statsmodels>=0.14"]  # only needed for Johansen beta initialization
 
 [tool.ruff]
 line-length = 90
@@ -28,7 +29,7 @@ ignore = [
 "tests/*" = ["ARG"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["config", "contracts", "data", "model", "pipeline", "registry", "training"]
+known-first-party = ["config", "contracts", "data", "experiments", "model", "pipeline", "registry", "training"]
 
 [tool.ruff.format]
 quote-style = "double"
