@@ -1,0 +1,220 @@
+
+>>> labour: 12 runs (12 seeds x 1 heads)
+    reusing 12 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.007702 (19s)
+    copula_spline      seed 1   overall=0.007865 (21s)
+    copula_spline      seed 2   overall=0.008063 (14s)
+    copula_spline      seed 3   overall=0.008044 (18s)
+    copula_spline      seed 4   overall=0.008140 (8s)
+    copula_spline      seed 5   overall=0.007913 (15s)
+    copula_spline      seed 6   overall=0.007941 (9s)
+    copula_spline      seed 7   overall=0.007728 (9s)
+    copula_spline      seed 8   overall=0.008912 (6s)
+    copula_spline      seed 9   overall=0.007987 (8s)
+    copula_spline      seed 10  overall=0.007861 (13s)
+    copula_spline      seed 11  overall=0.007894 (13s)
+
+==============================================================================
+labour
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.008091 +/-0.000325  0.008004 +/-0.000300    -1.07%
+Total                               0.004413 +/-0.000414  0.004570 +/-0.000303    +3.55%
+Geography                           0.006175 +/-0.000340  0.006044 +/-0.000451    -2.13%
+Gender/Geography                    0.008212 +/-0.000282  0.007957 +/-0.000380    -3.10%
+Status/Gender/Geography             0.013563 +/-0.000349  0.013446 +/-0.000256    -0.86%
+
+params:  factor_model=9,478   copula_spline=11,410
+cpu-seconds:  factor_model=116   copula_spline=153
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+>>> prison: 12 runs (12 seeds x 1 heads)
+    reusing 12 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.045971 (16s)
+    copula_spline      seed 1   overall=0.047291 (16s)
+    copula_spline      seed 2   overall=0.044543 (16s)
+    copula_spline      seed 3   overall=0.059322 (21s)
+    copula_spline      seed 4   overall=0.045325 (13s)
+    copula_spline      seed 5   overall=0.045357 (13s)
+    copula_spline      seed 6   overall=0.043816 (13s)
+    copula_spline      seed 7   overall=0.044521 (13s)
+    copula_spline      seed 8   overall=0.047531 (12s)
+    copula_spline      seed 9   overall=0.045593 (12s)
+    copula_spline      seed 10  overall=0.053286 (15s)
+    copula_spline      seed 11  overall=0.048607 (14s)
+
+==============================================================================
+prison
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.046746 +/-0.002745  0.047597 +/-0.004290    +1.82%
+Total                               0.028191 +/-0.004831  0.023145 +/-0.007826   -17.90%
+State                               0.051348 +/-0.002785  0.055844 +/-0.004385    +8.75%
+Gender                              0.028670 +/-0.004722  0.023534 +/-0.007593   -17.91%
+Legal                               0.052372 +/-0.001970  0.052994 +/-0.001385    +1.19%
+State/Gender/Legal                  0.073149 +/-0.001916  0.082468 +/-0.003753   +12.74%
+
+params:  factor_model=81,766   copula_spline=83,376
+cpu-seconds:  factor_model=129   copula_spline=174
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+>>> tourism_small: 12 runs (12 seeds x 1 heads)
+    reusing 12 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.066644 (19s)
+    copula_spline      seed 1   overall=0.068996 (17s)
+    copula_spline      seed 2   overall=0.065858 (17s)
+    copula_spline      seed 3   overall=0.070594 (17s)
+    copula_spline      seed 4   overall=0.070455 (14s)
+    copula_spline      seed 5   overall=0.069960 (14s)
+    copula_spline      seed 6   overall=0.072104 (14s)
+    copula_spline      seed 7   overall=0.066900 (13s)
+    copula_spline      seed 8   overall=0.070168 (12s)
+    copula_spline      seed 9   overall=0.071884 (12s)
+    copula_spline      seed 10  overall=0.070276 (12s)
+    copula_spline      seed 11  overall=0.066488 (12s)
+
+==============================================================================
+tourism_small
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.069716 +/-0.002720  0.069194 +/-0.002086    -0.75%
+Country                             0.028601 +/-0.002728  0.028878 +/-0.002554    +0.97%
+Country/Purpose                     0.052920 +/-0.004916  0.053415 +/-0.002757    +0.93%
+Country/Purpose/State               0.085783 +/-0.003148  0.085158 +/-0.003231    -0.73%
+Country/Purpose/State/CityNonCity   0.111559 +/-0.002917  0.109324 +/-0.002781    -2.00%
+
+params:  factor_model=148,140   copula_spline=149,750
+cpu-seconds:  factor_model=171   copula_spline=174
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+>>> wiki2: 12 runs (12 seeds x 1 heads)
+    reusing 12 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.246717 (34s)
+    copula_spline      seed 1   overall=0.237331 (41s)
+    copula_spline      seed 2   overall=0.251379 (60s)
+    copula_spline      seed 3   overall=0.236930 (38s)
+    copula_spline      seed 4   overall=0.230909 (56s)
+    copula_spline      seed 5   overall=0.234627 (48s)
+    copula_spline      seed 6   overall=0.235799 (44s)
+    copula_spline      seed 7   overall=0.230905 (56s)
+    copula_spline      seed 8   overall=0.232520 (40s)
+    copula_spline      seed 9   overall=0.250157 (30s)
+    copula_spline      seed 10  overall=0.245671 (39s)
+    copula_spline      seed 11  overall=0.242026 (31s)
+
+==============================================================================
+wiki2
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.246856 +/-0.008888  0.239581 +/-0.007049    -2.95%
+Total                               0.095012 +/-0.018078  0.106712 +/-0.015780   +12.31%
+Language                            0.183715 +/-0.008952  0.185355 +/-0.007600    +0.89%
+Language/Access                     0.268280 +/-0.013179  0.256660 +/-0.007731    -4.33%
+Language/Access/Agent               0.274603 +/-0.012936  0.263036 +/-0.007745    -4.21%
+Article                             0.412672 +/-0.014411  0.386141 +/-0.009043    -6.43%
+
+params:  factor_model=706,524   copula_spline=708,870
+cpu-seconds:  factor_model=434   copula_spline=518
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+>>> traffic: 12 runs (12 seeds x 1 heads)
+    reusing 12 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.018446 (49s)
+    copula_spline      seed 1   overall=0.023837 (26s)
+    copula_spline      seed 2   overall=0.018045 (86s)
+    copula_spline      seed 3   overall=0.020920 (26s)
+    copula_spline      seed 4   overall=0.020678 (39s)
+    copula_spline      seed 5   overall=0.021361 (43s)
+    copula_spline      seed 6   overall=0.020487 (53s)
+    copula_spline      seed 7   overall=0.018168 (68s)
+    copula_spline      seed 8   overall=0.023364 (30s)
+    copula_spline      seed 9   overall=0.022211 (29s)
+    copula_spline      seed 10  overall=0.020995 (24s)
+    copula_spline      seed 11  overall=0.022949 (28s)
+
+==============================================================================
+traffic
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.020019 +/-0.002250  0.020955 +/-0.001886    +4.68%
+Total                               0.006960 +/-0.002463  0.008407 +/-0.001508   +20.79%
+Halves                              0.008712 +/-0.002536  0.009755 +/-0.001649   +11.97%
+Quarters                            0.012350 +/-0.002417  0.012643 +/-0.002203    +2.37%
+Lanes                               0.052054 +/-0.002568  0.053016 +/-0.002727    +1.85%
+
+params:  factor_model=820,525   copula_spline=822,480
+cpu-seconds:  factor_model=493   copula_spline=501
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+>>> tourism_large: 12 runs (12 seeds x 1 heads)
+    reusing 12 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.124751 (306s)
+    copula_spline      seed 1   overall=0.122415 (305s)
+    copula_spline      seed 2   overall=0.123903 (267s)
+    copula_spline      seed 3   overall=0.124962 (382s)
+    copula_spline      seed 4   overall=0.126010 (148s)
+    copula_spline      seed 5   overall=0.124843 (277s)
+    copula_spline      seed 6   overall=0.126529 (316s)
+    copula_spline      seed 7   overall=0.127646 (350s)
+    copula_spline      seed 8   overall=0.123834 (239s)
+    copula_spline      seed 9   overall=0.124742 (344s)
+    copula_spline      seed 10  overall=0.124322 (336s)
+    copula_spline      seed 11  overall=0.125978 (322s)
+
+==============================================================================
+tourism_large
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.128782 +/-0.003064  0.124995 +/-0.001328    -2.94%
+Country                             0.049931 +/-0.005813  0.044613 +/-0.003944   -10.65%
+State                               0.072198 +/-0.003731  0.069073 +/-0.002510    -4.33%
+Zone                                0.114373 +/-0.002813  0.111235 +/-0.001309    -2.74%
+Region                              0.157094 +/-0.002693  0.153786 +/-0.001152    -2.11%
+Country/Purpose                     0.073664 +/-0.004594  0.068865 +/-0.002391    -6.52%
+State/Purpose                       0.115546 +/-0.003662  0.113185 +/-0.001339    -2.04%
+Zone/Purpose                        0.188330 +/-0.004817  0.184357 +/-0.001354    -2.11%
+Region/Purpose                      0.259124 +/-0.005510  0.254843 +/-0.002533    -1.65%
+
+params:  factor_model=1,328,984   copula_spline=1,330,985
+cpu-seconds:  factor_model=2636   copula_spline=3593
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+>>> police: 12 runs (12 seeds x 1 heads)
+    reusing 5 prior runs from --merge-jsonl
+    copula_spline      seed 0   overall=0.353731 (884s)
+    copula_spline      seed 1   overall=0.348722 (657s)
+    copula_spline      seed 2   overall=0.354285 (492s)
+    copula_spline      seed 3   overall=0.347328 (574s)
+    copula_spline      seed 4   overall=0.355573 (522s)
+    copula_spline      seed 5   overall=0.347938 (483s)
+    copula_spline      seed 6   overall=0.351715 (540s)
+    copula_spline      seed 7   overall=0.346564 (535s)
+    copula_spline      seed 8   overall=0.345790 (762s)
+    copula_spline      seed 9   overall=0.344245 (356s)
+    copula_spline      seed 10  overall=0.341834 (458s)
+    copula_spline      seed 11  overall=0.353251 (470s)
+
+==============================================================================
+police
+==============================================================================
+level                                       factor_model         copula_spline     delta
+----------------------------------------------------------------------------------------
+Overall                             0.347436 +/-0.002791  0.349248 +/-0.004207    +0.52%
+Total                               0.085876 +/-0.006259  0.086412 +/-0.008067    +0.62%
+Crime                               0.205685 +/-0.002671  0.205781 +/-0.003341    +0.05%
+Beat                                0.419846 +/-0.001770  0.422524 +/-0.002788    +0.64%
+Street                              0.151420 +/-0.004857  0.152655 +/-0.006521    +0.82%
+ZIP                                 0.392520 +/-0.001800  0.394731 +/-0.002928    +0.56%
+Crime/Beat/Street/ZIP               0.829272 +/-0.001628  0.833385 +/-0.003597    +0.50%
+
+params:  factor_model=2,394,474   copula_spline=2,396,820
+cpu-seconds:  factor_model=1652   copula_spline=6732
+(delta < 0 means the candidate beats factor_model; sCRPS is lower-is-better)
+
+wrote C:\Users\User\Desktop\Clover\Clover_N\clover\bench_spline_vs_gaussian.json

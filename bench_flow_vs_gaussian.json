@@ -1,0 +1,542 @@
+{
+  "labour": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.008090861574856176,
+          "std": 0.0003254687787107668,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.007946445555817626,
+          "std": 0.00024851855462250237,
+          "n_seeds": 12
+        },
+        "delta_pct": -1.7849275717106436
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.004413316623998456,
+          "std": 0.0004138980096526632,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.004137707497304719,
+          "std": 0.0003566407052038711,
+          "n_seeds": 12
+        },
+        "delta_pct": -6.244943433132503
+      },
+      "Geography": {
+        "factor_model": {
+          "mean": 0.006175354359077877,
+          "std": 0.00033958971586296765,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.006042281748376541,
+          "std": 0.0002865544881668137,
+          "n_seeds": 12
+        },
+        "delta_pct": -2.154898374466828
+      },
+      "Gender/Geography": {
+        "factor_model": {
+          "mean": 0.008212179201672968,
+          "std": 0.0002819619592088118,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.008107016108877747,
+          "std": 0.00024397902593100316,
+          "n_seeds": 12
+        },
+        "delta_pct": -1.2805747440800814
+      },
+      "Status/Gender/Geography": {
+        "factor_model": {
+          "mean": 0.013562596096082966,
+          "std": 0.0003492510504215474,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.013498776849490099,
+          "std": 0.0002555999135814493,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.47055332283543466
+      }
+    },
+    "n_params": {
+      "factor_model": 9478,
+      "normalizing_flow": 11518
+    },
+    "seconds": {
+      "factor_model": 115.82323122024536,
+      "normalizing_flow": 140.2244050502777
+    }
+  },
+  "prison": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.04674596677880131,
+          "std": 0.002744510413013999,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.0433481878452164,
+          "std": 0.002007763332331563,
+          "n_seeds": 12
+        },
+        "delta_pct": -7.268603406285218
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.028190635283004,
+          "std": 0.004831324495183008,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.01993082134600223,
+          "std": 0.0035026943714227842,
+          "n_seeds": 12
+        },
+        "delta_pct": -29.299850301641023
+      },
+      "State": {
+        "factor_model": {
+          "mean": 0.05134819511372043,
+          "std": 0.002785103666874122,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.04977598963619082,
+          "std": 0.0024166365455635273,
+          "n_seeds": 12
+        },
+        "delta_pct": -3.0618514906856134
+      },
+      "Gender": {
+        "factor_model": {
+          "mean": 0.028670085863386638,
+          "std": 0.004721950508127395,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.02056251953154309,
+          "std": 0.0033885013174589865,
+          "n_seeds": 12
+        },
+        "delta_pct": -28.278835195946805
+      },
+      "Legal": {
+        "factor_model": {
+          "mean": 0.05237214379256331,
+          "std": 0.0019699887625857374,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.05152689384302456,
+          "std": 0.0017937856582902344,
+          "n_seeds": 12
+        },
+        "delta_pct": -1.6139303995013767
+      },
+      "State/Gender/Legal": {
+        "factor_model": {
+          "mean": 0.07314877384133218,
+          "std": 0.0019160859547560148,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.07494471486932132,
+          "std": 0.002653752051474362,
+          "n_seeds": 12
+        },
+        "delta_pct": 2.455189518124705
+      }
+    },
+    "n_params": {
+      "factor_model": 81766,
+      "normalizing_flow": 83470
+    },
+    "seconds": {
+      "factor_model": 129.28156638145447,
+      "normalizing_flow": 144.6619896888733
+    }
+  },
+  "tourism_small": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.0697157186348575,
+          "std": 0.0027204196801029943,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.0650855874214803,
+          "std": 0.002951070530520341,
+          "n_seeds": 12
+        },
+        "delta_pct": -6.6414451490171675
+      },
+      "Country": {
+        "factor_model": {
+          "mean": 0.02860069634298612,
+          "std": 0.002728141833586078,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.02597048011406698,
+          "std": 0.002123842107924052,
+          "n_seeds": 12
+        },
+        "delta_pct": -9.19633633173467
+      },
+      "Country/Purpose": {
+        "factor_model": {
+          "mean": 0.052920233328908765,
+          "std": 0.004916161085901906,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.04983983598811031,
+          "std": 0.004042463069753931,
+          "n_seeds": 12
+        },
+        "delta_pct": -5.8208309885053495
+      },
+      "Country/Purpose/State": {
+        "factor_model": {
+          "mean": 0.08578320454465184,
+          "std": 0.003148299626271565,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.07974675834474822,
+          "std": 0.003819279113392142,
+          "n_seeds": 12
+        },
+        "delta_pct": -7.036862555958182
+      },
+      "Country/Purpose/State/CityNonCity": {
+        "factor_model": {
+          "mean": 0.1115587403228832,
+          "std": 0.0029170333805587055,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.10478527523899568,
+          "std": 0.003409457962028855,
+          "n_seeds": 12
+        },
+        "delta_pct": -6.0716579124891075
+      }
+    },
+    "n_params": {
+      "factor_model": 148140,
+      "normalizing_flow": 149844
+    },
+    "seconds": {
+      "factor_model": 170.99587678909302,
+      "normalizing_flow": 177.84508728981018
+    }
+  },
+  "wiki2": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.246856463964102,
+          "std": 0.008887944441182226,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.2456504328760646,
+          "std": 0.005957293210307107,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.48855560379928353
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.09501205996161931,
+          "std": 0.018077716091259372,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.10113436321651471,
+          "std": 0.017076502349194708,
+          "n_seeds": 12
+        },
+        "delta_pct": 6.4437117323511846
+      },
+      "Language": {
+        "factor_model": {
+          "mean": 0.1837153823514128,
+          "std": 0.008952377443045147,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.18575155243246486,
+          "std": 0.006744639679588701,
+          "n_seeds": 12
+        },
+        "delta_pct": 1.1083285759693489
+      },
+      "Language/Access": {
+        "factor_model": {
+          "mean": 0.2682798779711924,
+          "std": 0.013179236135210678,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.26568101996407734,
+          "std": 0.00763186787106372,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.9687114914351238
+      },
+      "Language/Access/Agent": {
+        "factor_model": {
+          "mean": 0.2746029089862471,
+          "std": 0.012935990855504544,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.2720172776137275,
+          "std": 0.007329308312568913,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.9415892140636788
+      },
+      "Article": {
+        "factor_model": {
+          "mean": 0.4126720905500383,
+          "std": 0.014411489081686065,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.4036679511535386,
+          "std": 0.009614345027384182,
+          "n_seeds": 12
+        },
+        "delta_pct": -2.1819114019797996
+      }
+    },
+    "n_params": {
+      "factor_model": 706524,
+      "normalizing_flow": 708996
+    },
+    "seconds": {
+      "factor_model": 434.0046145915985,
+      "normalizing_flow": 575.543046951294
+    }
+  },
+  "traffic": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.020019046639236527,
+          "std": 0.0022503693270241286,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.02120414579900415,
+          "std": 0.0017485387503273445,
+          "n_seeds": 12
+        },
+        "delta_pct": 5.9198581287326535
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.0069596200298652,
+          "std": 0.002463098569133693,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.008398214235107638,
+          "std": 0.00234195362166626,
+          "n_seeds": 12
+        },
+        "delta_pct": 20.670585449624053
+      },
+      "Halves": {
+        "factor_model": {
+          "mean": 0.008711841249792929,
+          "std": 0.0025356637451236235,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.010618551703467899,
+          "std": 0.0020019940479899297,
+          "n_seeds": 12
+        },
+        "delta_pct": 21.88642330598357
+      },
+      "Quarters": {
+        "factor_model": {
+          "mean": 0.012350234335887092,
+          "std": 0.002417011359085697,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.013991446194558402,
+          "std": 0.0018532583180683052,
+          "n_seeds": 12
+        },
+        "delta_pct": 13.288912696193183
+      },
+      "Lanes": {
+        "factor_model": {
+          "mean": 0.05205449080571078,
+          "std": 0.0025678449418370937,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.05180837093112237,
+          "std": 0.0024039248482784956,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.4728119913938404
+      }
+    },
+    "n_params": {
+      "factor_model": 820525,
+      "normalizing_flow": 822589
+    },
+    "seconds": {
+      "factor_model": 493.2418146133423,
+      "normalizing_flow": 493.4298050403595
+    }
+  },
+  "tourism_large": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.12878248114796442,
+          "std": 0.003063841275595362,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.12596024922660953,
+          "std": 0.003117686550573259,
+          "n_seeds": 12
+        },
+        "delta_pct": -2.191471927080121
+      },
+      "Country": {
+        "factor_model": {
+          "mean": 0.04993094787690255,
+          "std": 0.005813200003781495,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.045936493865172984,
+          "std": 0.0047197039228281295,
+          "n_seeds": 12
+        },
+        "delta_pct": -7.999956302807041
+      },
+      "State": {
+        "factor_model": {
+          "mean": 0.0721978326779385,
+          "std": 0.0037313643976078377,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.07011660565436585,
+          "std": 0.003767830888215292,
+          "n_seeds": 12
+        },
+        "delta_pct": -2.8826724381833273
+      },
+      "Zone": {
+        "factor_model": {
+          "mean": 0.11437259495641448,
+          "std": 0.0028125069871288255,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.11305653917623375,
+          "std": 0.0032849528294363064,
+          "n_seeds": 12
+        },
+        "delta_pct": -1.1506740584860065
+      },
+      "Region": {
+        "factor_model": {
+          "mean": 0.1570940721550404,
+          "std": 0.002692668192942112,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.15597526515962143,
+          "std": 0.004175127737639006,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.7121891870718002
+      },
+      "Country/Purpose": {
+        "factor_model": {
+          "mean": 0.07366405971986432,
+          "std": 0.004593950934211609,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.0666674814385211,
+          "std": 0.003735870740942892,
+          "n_seeds": 12
+        },
+        "delta_pct": -9.497953694040739
+      },
+      "State/Purpose": {
+        "factor_model": {
+          "mean": 0.11554604197062734,
+          "std": 0.003661527031473511,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.11258125318504171,
+          "std": 0.0029990635411505625,
+          "n_seeds": 12
+        },
+        "delta_pct": -2.565893850642937
+      },
+      "Zone/Purpose": {
+        "factor_model": {
+          "mean": 0.18832996946156033,
+          "std": 0.004817380700181201,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.1863622540121179,
+          "std": 0.005422946741689789,
+          "n_seeds": 12
+        },
+        "delta_pct": -1.0448233252881522
+      },
+      "Region/Purpose": {
+        "factor_model": {
+          "mean": 0.2591243298949681,
+          "std": 0.005510387903908441,
+          "n_seeds": 12
+        },
+        "normalizing_flow": {
+          "mean": 0.25698610085649704,
+          "std": 0.006752479094339989,
+          "n_seeds": 12
+        },
+        "delta_pct": -0.8251749418272488
+      }
+    },
+    "n_params": {
+      "factor_model": 1328984,
+      "normalizing_flow": 1331096
+    },
+    "seconds": {
+      "factor_model": 2636.032509803772,
+      "normalizing_flow": 2950.926081418991
+    }
+  }
+}

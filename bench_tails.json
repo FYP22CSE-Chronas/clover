@@ -1,0 +1,632 @@
+{
+  "wiki2|factor_model|0": {
+    "overall_scrps": 0.26481184026126203,
+    "pinball_q0.01": 0.007534965675259226,
+    "pinball_q0.5": 0.16198916181892542,
+    "pinball_q0.99": 0.0878659217061211
+  },
+  "wiki2|factor_model|1": {
+    "overall_scrps": 0.23818752779887906,
+    "pinball_q0.01": 0.007701244722997417,
+    "pinball_q0.5": 0.14554041992797032,
+    "pinball_q0.99": 0.08215566166525788
+  },
+  "wiki2|factor_model|2": {
+    "overall_scrps": 0.2455187180132394,
+    "pinball_q0.01": 0.007330409513110357,
+    "pinball_q0.5": 0.1462078433439002,
+    "pinball_q0.99": 0.08653295760120376
+  },
+  "wiki2|factor_model|3": {
+    "overall_scrps": 0.24667362150171449,
+    "pinball_q0.01": 0.007291946832108556,
+    "pinball_q0.5": 0.15149241929865012,
+    "pinball_q0.99": 0.08383713655385204
+  },
+  "wiki2|factor_model|4": {
+    "overall_scrps": 0.23665100151765048,
+    "pinball_q0.01": 0.007307151868699535,
+    "pinball_q0.5": 0.14362720683517433,
+    "pinball_q0.99": 0.07027487798222493
+  },
+  "wiki2|normalizing_flow|0": {
+    "overall_scrps": 0.26528658185989434,
+    "pinball_q0.01": 0.007929180314998164,
+    "pinball_q0.5": 0.16065342909497163,
+    "pinball_q0.99": 0.09785401423757258
+  },
+  "wiki2|normalizing_flow|1": {
+    "overall_scrps": 0.24654834198590503,
+    "pinball_q0.01": 0.008422326730584425,
+    "pinball_q0.5": 0.15227248664659804,
+    "pinball_q0.99": 0.09295033529230858
+  },
+  "wiki2|normalizing_flow|2": {
+    "overall_scrps": 0.2533592868379203,
+    "pinball_q0.01": 0.008270519475086002,
+    "pinball_q0.5": 0.15562527848780888,
+    "pinball_q0.99": 0.09178877070067328
+  },
+  "wiki2|normalizing_flow|3": {
+    "overall_scrps": 0.2420444546216008,
+    "pinball_q0.01": 0.007959018093676452,
+    "pinball_q0.5": 0.1472086782157163,
+    "pinball_q0.99": 0.08732488979378511
+  },
+  "wiki2|normalizing_flow|4": {
+    "overall_scrps": 0.25607323360102163,
+    "pinball_q0.01": 0.0076802974124544785,
+    "pinball_q0.5": 0.15766968659841785,
+    "pinball_q0.99": 0.0946724988213797
+  },
+  "wiki2|normalizing_flow_shared|0": {
+    "overall_scrps": 0.26624005073842,
+    "pinball_q0.01": 0.007256501859155223,
+    "pinball_q0.5": 0.1643784456792086,
+    "pinball_q0.99": 0.0902780653409685
+  },
+  "wiki2|normalizing_flow_shared|1": {
+    "overall_scrps": 0.24960460072067361,
+    "pinball_q0.01": 0.007962191481473887,
+    "pinball_q0.5": 0.15158572440324392,
+    "pinball_q0.99": 0.09668352675122928
+  },
+  "wiki2|normalizing_flow_shared|2": {
+    "overall_scrps": 0.24437268314173868,
+    "pinball_q0.01": 0.0074187271053186695,
+    "pinball_q0.5": 0.14665420195931775,
+    "pinball_q0.99": 0.0857478864382829
+  },
+  "wiki2|normalizing_flow_shared|3": {
+    "overall_scrps": 0.23909824721657214,
+    "pinball_q0.01": 0.007202783581803915,
+    "pinball_q0.5": 0.14796616636398124,
+    "pinball_q0.99": 0.07910046663113413
+  },
+  "wiki2|normalizing_flow_shared|4": {
+    "overall_scrps": 0.23936905250732216,
+    "pinball_q0.01": 0.007103326259279112,
+    "pinball_q0.5": 0.14697193123930788,
+    "pinball_q0.99": 0.07004551144346888
+  },
+  "traffic|factor_model|0": {
+    "overall_scrps": 0.01993113579542606,
+    "pinball_q0.01": 0.0010683511208886914,
+    "pinball_q0.5": 0.012825733793869129,
+    "pinball_q0.99": 0.0015776109758614523
+  },
+  "traffic|factor_model|1": {
+    "overall_scrps": 0.02320107320294443,
+    "pinball_q0.01": 0.0015343491298392409,
+    "pinball_q0.5": 0.01319863510994081,
+    "pinball_q0.99": 0.0017880224697395814
+  },
+  "traffic|factor_model|2": {
+    "overall_scrps": 0.02007118509575863,
+    "pinball_q0.01": 0.0011250673045719308,
+    "pinball_q0.5": 0.012795208138952206,
+    "pinball_q0.99": 0.001557938122622409
+  },
+  "traffic|factor_model|3": {
+    "overall_scrps": 0.02431133861604787,
+    "pinball_q0.01": 0.0010319616215909372,
+    "pinball_q0.5": 0.017113520090651906,
+    "pinball_q0.99": 0.0015000465087711492
+  },
+  "traffic|factor_model|4": {
+    "overall_scrps": 0.02002779355866334,
+    "pinball_q0.01": 0.001576149730914339,
+    "pinball_q0.5": 0.013216070242697489,
+    "pinball_q0.99": 0.0013525975075718137
+  },
+  "traffic|normalizing_flow|0": {
+    "overall_scrps": 0.022157569062747646,
+    "pinball_q0.01": 0.001375582371528076,
+    "pinball_q0.5": 0.013281820010113,
+    "pinball_q0.99": 0.001745161018725874
+  },
+  "traffic|normalizing_flow|1": {
+    "overall_scrps": 0.01741219601123752,
+    "pinball_q0.01": 0.0008841681726331767,
+    "pinball_q0.5": 0.011974158194234972,
+    "pinball_q0.99": 0.0014334288385622438
+  },
+  "traffic|normalizing_flow|2": {
+    "overall_scrps": 0.018286592371524392,
+    "pinball_q0.01": 0.0010157503046008074,
+    "pinball_q0.5": 0.011273033243431681,
+    "pinball_q0.99": 0.00149665054640273
+  },
+  "traffic|normalizing_flow|3": {
+    "overall_scrps": 0.019768203375242935,
+    "pinball_q0.01": 0.0009629462587452812,
+    "pinball_q0.5": 0.013413952312223577,
+    "pinball_q0.99": 0.0015714116284169847
+  },
+  "traffic|normalizing_flow|4": {
+    "overall_scrps": 0.01890863754913582,
+    "pinball_q0.01": 0.0011888490165918133,
+    "pinball_q0.5": 0.011278883469556203,
+    "pinball_q0.99": 0.0017058734145575483
+  },
+  "traffic|normalizing_flow_shared|0": {
+    "overall_scrps": 0.024275335817445485,
+    "pinball_q0.01": 0.0013130773840860537,
+    "pinball_q0.5": 0.016989951850604562,
+    "pinball_q0.99": 0.0016182174149123373
+  },
+  "traffic|normalizing_flow_shared|1": {
+    "overall_scrps": 0.020774644264444912,
+    "pinball_q0.01": 0.0015388319067030896,
+    "pinball_q0.5": 0.012842543387827208,
+    "pinball_q0.99": 0.0017298944005345828
+  },
+  "traffic|normalizing_flow_shared|2": {
+    "overall_scrps": 0.017815475976152555,
+    "pinball_q0.01": 0.0008207617787554615,
+    "pinball_q0.5": 0.011797055347227248,
+    "pinball_q0.99": 0.001525052913194726
+  },
+  "traffic|normalizing_flow_shared|3": {
+    "overall_scrps": 0.02441917992178729,
+    "pinball_q0.01": 0.0010494724726856203,
+    "pinball_q0.5": 0.017535975193820684,
+    "pinball_q0.99": 0.0015970588886802253
+  },
+  "traffic|normalizing_flow_shared|4": {
+    "overall_scrps": 0.0236175753732693,
+    "pinball_q0.01": 0.0021019401548846572,
+    "pinball_q0.5": 0.01617094490576988,
+    "pinball_q0.99": 0.001646216849297205
+  },
+  "labour|factor_model|0": {
+    "overall_scrps": 0.007944771408229648,
+    "pinball_q0.01": 0.0005353684080684734,
+    "pinball_q0.5": 0.004923300928688095,
+    "pinball_q0.99": 0.0004712870834507714
+  },
+  "labour|factor_model|1": {
+    "overall_scrps": 0.007784266354882492,
+    "pinball_q0.01": 0.0005230495283413196,
+    "pinball_q0.5": 0.004917747866162685,
+    "pinball_q0.99": 0.0004418960333259011
+  },
+  "labour|factor_model|2": {
+    "overall_scrps": 0.008705726992266329,
+    "pinball_q0.01": 0.0005767799622550005,
+    "pinball_q0.5": 0.00593309441854212,
+    "pinball_q0.99": 0.0004274336462283083
+  },
+  "labour|factor_model|3": {
+    "overall_scrps": 0.008156085050390095,
+    "pinball_q0.01": 0.0004978538193132925,
+    "pinball_q0.5": 0.005613783610730688,
+    "pinball_q0.99": 0.0003826843464845561
+  },
+  "labour|factor_model|4": {
+    "overall_scrps": 0.008089973631348677,
+    "pinball_q0.01": 0.0005230812257562432,
+    "pinball_q0.5": 0.0051476781041169565,
+    "pinball_q0.99": 0.00046511154301727577
+  },
+  "labour|normalizing_flow|0": {
+    "overall_scrps": 0.007769925988265922,
+    "pinball_q0.01": 0.0005098035661671944,
+    "pinball_q0.5": 0.004918291602792264,
+    "pinball_q0.99": 0.00045479502778847353
+  },
+  "labour|normalizing_flow|1": {
+    "overall_scrps": 0.00767114225207477,
+    "pinball_q0.01": 0.0005009733743251866,
+    "pinball_q0.5": 0.004854892357635488,
+    "pinball_q0.99": 0.0004332121322579275
+  },
+  "labour|normalizing_flow|2": {
+    "overall_scrps": 0.008440721004441628,
+    "pinball_q0.01": 0.0006361485259179762,
+    "pinball_q0.5": 0.005240766741374411,
+    "pinball_q0.99": 0.0005159807309283452
+  },
+  "labour|normalizing_flow|3": {
+    "overall_scrps": 0.008022738429561003,
+    "pinball_q0.01": 0.0005046319391626905,
+    "pinball_q0.5": 0.005528508181320458,
+    "pinball_q0.99": 0.0003676908047223561
+  },
+  "labour|normalizing_flow|4": {
+    "overall_scrps": 0.008006763068161591,
+    "pinball_q0.01": 0.0005892521852599371,
+    "pinball_q0.5": 0.004960228729741696,
+    "pinball_q0.99": 0.00045345224851685046
+  },
+  "labour|normalizing_flow_shared|0": {
+    "overall_scrps": 0.007965315478526594,
+    "pinball_q0.01": 0.000543951831742085,
+    "pinball_q0.5": 0.004927021970400128,
+    "pinball_q0.99": 0.00047322411231224583
+  },
+  "labour|normalizing_flow_shared|1": {
+    "overall_scrps": 0.007793771218835598,
+    "pinball_q0.01": 0.0005455443441371961,
+    "pinball_q0.5": 0.00492279373835045,
+    "pinball_q0.99": 0.00044180266666304804
+  },
+  "labour|normalizing_flow_shared|2": {
+    "overall_scrps": 0.008683732784643237,
+    "pinball_q0.01": 0.0005813027319227646,
+    "pinball_q0.5": 0.005939427911305495,
+    "pinball_q0.99": 0.0004260927028055919
+  },
+  "labour|normalizing_flow_shared|3": {
+    "overall_scrps": 0.008103366544689667,
+    "pinball_q0.01": 0.000502235895279117,
+    "pinball_q0.5": 0.005590599133734889,
+    "pinball_q0.99": 0.0003795871822148473
+  },
+  "labour|normalizing_flow_shared|4": {
+    "overall_scrps": 0.008135709474209248,
+    "pinball_q0.01": 0.000545849467015809,
+    "pinball_q0.5": 0.005132455001701037,
+    "pinball_q0.99": 0.00047337235346161404
+  },
+  "tourism_small|factor_model|0": {
+    "overall_scrps": 0.06099478536812215,
+    "pinball_q0.01": 0.0039338138078647234,
+    "pinball_q0.5": 0.04144927742055196,
+    "pinball_q0.99": 0.004201607175144824
+  },
+  "tourism_small|factor_model|1": {
+    "overall_scrps": 0.06868515214471439,
+    "pinball_q0.01": 0.00472057397990609,
+    "pinball_q0.5": 0.047780379263704875,
+    "pinball_q0.99": 0.004610024609923212
+  },
+  "tourism_small|factor_model|2": {
+    "overall_scrps": 0.0634169045135431,
+    "pinball_q0.01": 0.004686555418982073,
+    "pinball_q0.5": 0.04390655416625708,
+    "pinball_q0.99": 0.004449974107294591
+  },
+  "tourism_small|factor_model|3": {
+    "overall_scrps": 0.06919494919834955,
+    "pinball_q0.01": 0.005505275466418058,
+    "pinball_q0.5": 0.04616067067648703,
+    "pinball_q0.99": 0.005777451665793374
+  },
+  "tourism_small|factor_model|4": {
+    "overall_scrps": 0.06929969704356041,
+    "pinball_q0.01": 0.005299379838224865,
+    "pinball_q0.5": 0.04679259394790731,
+    "pinball_q0.99": 0.0053279366183627015
+  },
+  "tourism_small|normalizing_flow|0": {
+    "overall_scrps": 0.05990038550630765,
+    "pinball_q0.01": 0.004628969048343365,
+    "pinball_q0.5": 0.04054680283419624,
+    "pinball_q0.99": 0.004400759922650219
+  },
+  "tourism_small|normalizing_flow|1": {
+    "overall_scrps": 0.06465754437259112,
+    "pinball_q0.01": 0.003243552277424807,
+    "pinball_q0.5": 0.045404467761423505,
+    "pinball_q0.99": 0.004459670726875405
+  },
+  "tourism_small|normalizing_flow|2": {
+    "overall_scrps": 0.06991149928088004,
+    "pinball_q0.01": 0.0039436468523146185,
+    "pinball_q0.5": 0.04866273162230093,
+    "pinball_q0.99": 0.004418390095774373
+  },
+  "tourism_small|normalizing_flow|3": {
+    "overall_scrps": 0.059536553472836526,
+    "pinball_q0.01": 0.004068253260009887,
+    "pinball_q0.5": 0.04061090493886477,
+    "pinball_q0.99": 0.004610693444108659
+  },
+  "tourism_small|normalizing_flow|4": {
+    "overall_scrps": 0.06570277410879538,
+    "pinball_q0.01": 0.004390854874412426,
+    "pinball_q0.5": 0.044643340615691134,
+    "pinball_q0.99": 0.0048316721487141785
+  },
+  "tourism_small|normalizing_flow_shared|0": {
+    "overall_scrps": 0.06768617842410148,
+    "pinball_q0.01": 0.004907258145898283,
+    "pinball_q0.5": 0.04607648502629263,
+    "pinball_q0.99": 0.004997121819313269
+  },
+  "tourism_small|normalizing_flow_shared|1": {
+    "overall_scrps": 0.06979488640026017,
+    "pinball_q0.01": 0.003993678707674697,
+    "pinball_q0.5": 0.04850253877813317,
+    "pinball_q0.99": 0.004909489842572171
+  },
+  "tourism_small|normalizing_flow_shared|2": {
+    "overall_scrps": 0.06265062890736942,
+    "pinball_q0.01": 0.004626863415098796,
+    "pinball_q0.5": 0.0434468684187224,
+    "pinball_q0.99": 0.004439351552492007
+  },
+  "tourism_small|normalizing_flow_shared|3": {
+    "overall_scrps": 0.0669662211232625,
+    "pinball_q0.01": 0.006201738554158601,
+    "pinball_q0.5": 0.044678592274604516,
+    "pinball_q0.99": 0.006021687489353326
+  },
+  "tourism_small|normalizing_flow_shared|4": {
+    "overall_scrps": 0.06998415105561362,
+    "pinball_q0.01": 0.005873543812601801,
+    "pinball_q0.5": 0.04728446083707008,
+    "pinball_q0.99": 0.005007984015195105
+  },
+  "prison|factor_model|0": {
+    "overall_scrps": 0.043595594736299696,
+    "pinball_q0.01": 0.0020669182554869836,
+    "pinball_q0.5": 0.030127339712227256,
+    "pinball_q0.99": 0.004474827477974613
+  },
+  "prison|factor_model|1": {
+    "overall_scrps": 0.04491844734631033,
+    "pinball_q0.01": 0.002165613164079657,
+    "pinball_q0.5": 0.03074274015447511,
+    "pinball_q0.99": 0.004071344628709437
+  },
+  "prison|factor_model|2": {
+    "overall_scrps": 0.04951250261853408,
+    "pinball_q0.01": 0.0017209833967681558,
+    "pinball_q0.5": 0.031230301474401135,
+    "pinball_q0.99": 0.014115585916284094
+  },
+  "prison|factor_model|3": {
+    "overall_scrps": 0.0449528795516827,
+    "pinball_q0.01": 0.001653380887062065,
+    "pinball_q0.5": 0.0308437946685878,
+    "pinball_q0.99": 0.006425977414510163
+  },
+  "prison|factor_model|4": {
+    "overall_scrps": 0.04427694501747568,
+    "pinball_q0.01": 0.0024808845799231993,
+    "pinball_q0.5": 0.029951093425948525,
+    "pinball_q0.99": 0.0036319296043801383
+  },
+  "prison|normalizing_flow|0": {
+    "overall_scrps": 0.04229634260055612,
+    "pinball_q0.01": 0.001688373252303799,
+    "pinball_q0.5": 0.028864547982444665,
+    "pinball_q0.99": 0.006221014943540645
+  },
+  "prison|normalizing_flow|1": {
+    "overall_scrps": 0.044187157842125284,
+    "pinball_q0.01": 0.0015299568317664511,
+    "pinball_q0.5": 0.029983886122752552,
+    "pinball_q0.99": 0.008024277801250037
+  },
+  "prison|normalizing_flow|2": {
+    "overall_scrps": 0.04372472259716175,
+    "pinball_q0.01": 0.0015638882806235774,
+    "pinball_q0.5": 0.02940678420330517,
+    "pinball_q0.99": 0.0068747345368495826
+  },
+  "prison|normalizing_flow|3": {
+    "overall_scrps": 0.04710793588900794,
+    "pinball_q0.01": 0.0015736643635359886,
+    "pinball_q0.5": 0.03123336569785508,
+    "pinball_q0.99": 0.009760385479101881
+  },
+  "prison|normalizing_flow|4": {
+    "overall_scrps": 0.04202461389517849,
+    "pinball_q0.01": 0.0015793355669789905,
+    "pinball_q0.5": 0.028867374075431895,
+    "pinball_q0.99": 0.005971296425513594
+  },
+  "prison|normalizing_flow_shared|0": {
+    "overall_scrps": 0.043558144447334635,
+    "pinball_q0.01": 0.0020444596368359605,
+    "pinball_q0.5": 0.029960749835987715,
+    "pinball_q0.99": 0.004597475184312782
+  },
+  "prison|normalizing_flow_shared|1": {
+    "overall_scrps": 0.04491271491176741,
+    "pinball_q0.01": 0.0021731529960431345,
+    "pinball_q0.5": 0.030703547297355527,
+    "pinball_q0.99": 0.004188641177932321
+  },
+  "prison|normalizing_flow_shared|2": {
+    "overall_scrps": 0.0501954425551577,
+    "pinball_q0.01": 0.002370839904777686,
+    "pinball_q0.5": 0.03382012497641701,
+    "pinball_q0.99": 0.00495219156960738
+  },
+  "prison|normalizing_flow_shared|3": {
+    "overall_scrps": 0.04521122546164272,
+    "pinball_q0.01": 0.0016721363934625335,
+    "pinball_q0.5": 0.030991417595703966,
+    "pinball_q0.99": 0.006737431754248622
+  },
+  "prison|normalizing_flow_shared|4": {
+    "overall_scrps": 0.04430179434715601,
+    "pinball_q0.01": 0.002456932210272395,
+    "pinball_q0.5": 0.029952030806616962,
+    "pinball_q0.99": 0.0038114985645184484
+  },
+  "police|factor_model|0": {
+    "overall_scrps": 0.3525153261683226,
+    "pinball_q0.01": 0.008277919270380732,
+    "pinball_q0.5": 0.2327960365405749,
+    "pinball_q0.99": 0.03245541269520479
+  },
+  "police|factor_model|1": {
+    "overall_scrps": 0.3444145560926219,
+    "pinball_q0.01": 0.007871249025914484,
+    "pinball_q0.5": 0.22726260235194867,
+    "pinball_q0.99": 0.03185207987868312
+  },
+  "police|factor_model|2": {
+    "overall_scrps": 0.3464284710523841,
+    "pinball_q0.01": 0.007932236225924141,
+    "pinball_q0.5": 0.2283175196178509,
+    "pinball_q0.99": 0.03215561070090954
+  },
+  "police|factor_model|3": {
+    "overall_scrps": 0.34852362420319594,
+    "pinball_q0.01": 0.00792203634541444,
+    "pinball_q0.5": 0.22996121747394468,
+    "pinball_q0.99": 0.03179036607950217
+  },
+  "police|factor_model|4": {
+    "overall_scrps": 0.34326449033348366,
+    "pinball_q0.01": 0.007843789931584593,
+    "pinball_q0.5": 0.2261666022032266,
+    "pinball_q0.99": 0.03135727161686896
+  },
+  "police|normalizing_flow|0": {
+    "overall_scrps": 0.35178490824760894,
+    "pinball_q0.01": 0.008274734390329726,
+    "pinball_q0.5": 0.23218327666637184,
+    "pinball_q0.99": 0.032132106510997994
+  },
+  "police|normalizing_flow|1": {
+    "overall_scrps": 0.34277495341051806,
+    "pinball_q0.01": 0.00787413513049545,
+    "pinball_q0.5": 0.22532671353190564,
+    "pinball_q0.99": 0.03163666753750477
+  },
+  "police|normalizing_flow|2": {
+    "overall_scrps": 0.3468868106961143,
+    "pinball_q0.01": 0.008380165652587682,
+    "pinball_q0.5": 0.2291744217083167,
+    "pinball_q0.99": 0.031222579824773652
+  },
+  "police|normalizing_flow|3": {
+    "overall_scrps": 0.34801252084612494,
+    "pinball_q0.01": 0.00823239941853058,
+    "pinball_q0.5": 0.22986642099523122,
+    "pinball_q0.99": 0.0315720797546309
+  },
+  "police|normalizing_flow|4": {
+    "overall_scrps": 0.34995424720215645,
+    "pinball_q0.01": 0.007767378428215307,
+    "pinball_q0.5": 0.23124604934061388,
+    "pinball_q0.99": 0.03221629405462652
+  },
+  "police|normalizing_flow_shared|0": {
+    "overall_scrps": 0.3543504116406891,
+    "pinball_q0.01": 0.00818940485116462,
+    "pinball_q0.5": 0.2338764392647356,
+    "pinball_q0.99": 0.03257967874840106
+  },
+  "police|normalizing_flow_shared|1": {
+    "overall_scrps": 0.34393033188532246,
+    "pinball_q0.01": 0.0079318169446588,
+    "pinball_q0.5": 0.2262469428416507,
+    "pinball_q0.99": 0.031974548589796106
+  },
+  "police|normalizing_flow_shared|2": {
+    "overall_scrps": 0.3436095758042708,
+    "pinball_q0.01": 0.007940314376718487,
+    "pinball_q0.5": 0.22623871440027507,
+    "pinball_q0.99": 0.032039391454849665
+  },
+  "police|normalizing_flow_shared|3": {
+    "overall_scrps": 0.3479461822291549,
+    "pinball_q0.01": 0.008005442074298423,
+    "pinball_q0.5": 0.22949472165327894,
+    "pinball_q0.99": 0.03169178324578024
+  },
+  "police|normalizing_flow_shared|4": {
+    "overall_scrps": 0.34452160942709803,
+    "pinball_q0.01": 0.0077641823195911475,
+    "pinball_q0.5": 0.227034516726497,
+    "pinball_q0.99": 0.0318221529442541
+  },
+  "tourism_large|factor_model|0": {
+    "overall_scrps": 0.12736304321650715,
+    "pinball_q0.01": 0.005157803971393736,
+    "pinball_q0.5": 0.08671597737971269,
+    "pinball_q0.99": 0.012909226995857438
+  },
+  "tourism_large|factor_model|1": {
+    "overall_scrps": 0.12983408075893318,
+    "pinball_q0.01": 0.0051980138213130744,
+    "pinball_q0.5": 0.08842087414974542,
+    "pinball_q0.99": 0.013017256020566147
+  },
+  "tourism_large|factor_model|2": {
+    "overall_scrps": 0.13185014797862463,
+    "pinball_q0.01": 0.0052384602008329565,
+    "pinball_q0.5": 0.08976403747957008,
+    "pinball_q0.99": 0.01372308736300086
+  },
+  "tourism_large|factor_model|3": {
+    "overall_scrps": 0.1249660062611051,
+    "pinball_q0.01": 0.004849963313511843,
+    "pinball_q0.5": 0.08464325755350292,
+    "pinball_q0.99": 0.012043687630256124
+  },
+  "tourism_large|factor_model|4": {
+    "overall_scrps": 0.12847458886427063,
+    "pinball_q0.01": 0.005147500800105858,
+    "pinball_q0.5": 0.08763691801380477,
+    "pinball_q0.99": 0.013329225116317506
+  },
+  "tourism_large|normalizing_flow|0": {
+    "overall_scrps": 0.12769533767447663,
+    "pinball_q0.01": 0.004819378240579875,
+    "pinball_q0.5": 0.08582788166775289,
+    "pinball_q0.99": 0.013434187748055049
+  },
+  "tourism_large|normalizing_flow|1": {
+    "overall_scrps": 0.12619561395304013,
+    "pinball_q0.01": 0.004963396261008358,
+    "pinball_q0.5": 0.08458702332857727,
+    "pinball_q0.99": 0.012455517164818426
+  },
+  "tourism_large|normalizing_flow|2": {
+    "overall_scrps": 0.12161717319372808,
+    "pinball_q0.01": 0.004624595183792574,
+    "pinball_q0.5": 0.08174352186713534,
+    "pinball_q0.99": 0.012618207307514003
+  },
+  "tourism_large|normalizing_flow|3": {
+    "overall_scrps": 0.12575990738072718,
+    "pinball_q0.01": 0.004886610029636901,
+    "pinball_q0.5": 0.08564556313408137,
+    "pinball_q0.99": 0.013630100801634758
+  },
+  "tourism_large|normalizing_flow|4": {
+    "overall_scrps": 0.1277053627938036,
+    "pinball_q0.01": 0.005015753635256979,
+    "pinball_q0.5": 0.08724947262876526,
+    "pinball_q0.99": 0.012900602772472094
+  },
+  "tourism_large|normalizing_flow_shared|0": {
+    "overall_scrps": 0.12897591764728716,
+    "pinball_q0.01": 0.005167554091528441,
+    "pinball_q0.5": 0.08799311400128956,
+    "pinball_q0.99": 0.013474144996277502
+  },
+  "tourism_large|normalizing_flow_shared|1": {
+    "overall_scrps": 0.12937573235686306,
+    "pinball_q0.01": 0.005154057435070987,
+    "pinball_q0.5": 0.08796255184405699,
+    "pinball_q0.99": 0.013285204178850558
+  },
+  "tourism_large|normalizing_flow_shared|2": {
+    "overall_scrps": 0.13190638600494112,
+    "pinball_q0.01": 0.005217598017714093,
+    "pinball_q0.5": 0.08971449315763787,
+    "pinball_q0.99": 0.014060366204167682
+  },
+  "tourism_large|normalizing_flow_shared|3": {
+    "overall_scrps": 0.12631186974617392,
+    "pinball_q0.01": 0.004874841102974185,
+    "pinball_q0.5": 0.08525197108685902,
+    "pinball_q0.99": 0.012799337716023668
+  },
+  "tourism_large|normalizing_flow_shared|4": {
+    "overall_scrps": 0.12754652164134925,
+    "pinball_q0.01": 0.005115371811474709,
+    "pinball_q0.5": 0.08690825370128459,
+    "pinball_q0.99": 0.013486948723098288
+  }
+}

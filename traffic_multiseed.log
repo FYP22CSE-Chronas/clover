@@ -1,0 +1,57 @@
+traffic: N=207 h=1 test window 2008-09-30 to 2008-09-30   3 heads x 15 seeds
+    factor_model       seed 0   overall=0.020017 (22s)
+    factor_model       seed 1   overall=0.023191 (22s)
+    factor_model       seed 2   overall=0.018857 (30s)
+    factor_model       seed 3   overall=0.016233 (86s)
+    factor_model       seed 4   overall=0.020320 (26s)
+    factor_model       seed 5   overall=0.019676 (21s)
+    factor_model       seed 6   overall=0.024740 (34s)
+    factor_model       seed 7   overall=0.019725 (26s)
+    factor_model       seed 8   overall=0.021275 (43s)
+    factor_model       seed 9   overall=0.019964 (41s)
+    factor_model       seed 10  overall=0.019462 (33s)
+    factor_model       seed 11  overall=0.016769 (56s)
+    factor_model       seed 12  overall=0.030828 (24s)
+    factor_model       seed 13  overall=0.020701 (36s)
+    factor_model       seed 14  overall=0.020798 (22s)
+    normalizing_flow   seed 0   overall=0.021305 (27s)
+    normalizing_flow   seed 1   overall=0.020439 (44s)
+    normalizing_flow   seed 2   overall=0.018255 (37s)
+    normalizing_flow   seed 3   overall=0.024723 (37s)
+    normalizing_flow   seed 4   overall=0.020854 (37s)
+    normalizing_flow   seed 5   overall=0.021714 (31s)
+    normalizing_flow   seed 6   overall=0.020546 (31s)
+    normalizing_flow   seed 7   overall=0.020668 (34s)
+    normalizing_flow   seed 8   overall=0.024238 (27s)
+    normalizing_flow   seed 9   overall=0.019124 (52s)
+    normalizing_flow   seed 10  overall=0.020867 (38s)
+    normalizing_flow   seed 11  overall=0.021717 (31s)
+    normalizing_flow   seed 12  overall=0.024431 (31s)
+    normalizing_flow   seed 13  overall=0.024189 (24s)
+    normalizing_flow   seed 14  overall=0.028828 (38s)
+    copula_spline      seed 0   overall=0.018446 (44s)
+    copula_spline      seed 1   overall=0.023837 (24s)
+    copula_spline      seed 2   overall=0.018045 (76s)
+    copula_spline      seed 3   overall=0.020920 (24s)
+    copula_spline      seed 4   overall=0.020678 (34s)
+    copula_spline      seed 5   overall=0.021361 (37s)
+    copula_spline      seed 6   overall=0.020487 (48s)
+    copula_spline      seed 7   overall=0.018168 (66s)
+    copula_spline      seed 8   overall=0.023364 (27s)
+    copula_spline      seed 9   overall=0.022211 (27s)
+    copula_spline      seed 10  overall=0.020995 (24s)
+    copula_spline      seed 11  overall=0.022949 (31s)
+    copula_spline      seed 12  overall=0.025022 (35s)
+    copula_spline      seed 13  overall=0.020529 (35s)
+    copula_spline      seed 14  overall=0.020423 (25s)
+
+Gaussian factor model: Overall sCRPS 0.020837 +/-0.003353 over 15 seeds
+  wrote C:\Users\User\Desktop\Clover\Clover_N\clover\results/figures\traffic_multiseed\fan_charts_test_factor_model.png
+
+Normalizing flow: Overall sCRPS 0.022127 +/-0.002600 over 15 seeds
+  wrote C:\Users\User\Desktop\Clover\Clover_N\clover\results/figures\traffic_multiseed\fan_charts_test_normalizing_flow.png
+
+Gaussian-copula spline: Overall sCRPS 0.021162 +/-0.001984 over 15 seeds
+  wrote C:\Users\User\Desktop\Clover\Clover_N\clover\results/figures\traffic_multiseed\fan_charts_test_copula_spline.png
+
+wrote 7 files to C:\Users\User\Desktop\Clover\Clover_N\clover\results/figures\traffic_multiseed

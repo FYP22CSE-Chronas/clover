@@ -1,0 +1,23 @@
+{
+  "tourism_small|factor_model": 0.06099478536812215,
+  "tourism_small|normalizing_flow": 0.05990038550630765,
+  "tourism_small|normalizing_flow_shared": 0.06768617842410148,
+  "prison|factor_model": 0.043595594736299696,
+  "prison|normalizing_flow": 0.04229634260055612,
+  "prison|normalizing_flow_shared": 0.043558144447334635,
+  "labour|factor_model": 0.007944771408229648,
+  "labour|normalizing_flow": 0.007769925988265922,
+  "labour|normalizing_flow_shared": 0.007965315478526594,
+  "police|factor_model": 0.3525153261683226,
+  "police|normalizing_flow": 0.35178490824760894,
+  "police|normalizing_flow_shared": 0.3543504116406891,
+  "tourism_large|factor_model": 0.12736304321650715,
+  "tourism_large|normalizing_flow": 0.12769533767447663,
+  "tourism_large|normalizing_flow_shared": 0.12897591764728716,
+  "wiki2|factor_model": 0.26481184026126203,
+  "wiki2|normalizing_flow": 0.26528658185989434,
+  "wiki2|normalizing_flow_shared": 0.26624005073842,
+  "traffic|factor_model": 0.01993113579542606,
+  "traffic|normalizing_flow": 0.022157569062747646,
+  "traffic|normalizing_flow_shared": 0.024275335817445485
+}
