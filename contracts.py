@@ -61,6 +61,27 @@ class FlowParams:
 
 
 @dataclass(frozen=True)
+class DDSFParams:
+    """Deep-dense-sigmoidal-flow factor-model parameters at the bottom level.
+
+    Same mu/sigma/F factor structure as `FactorParams`; `ddsf_w`/`ddsf_a`/`ddsf_b`
+    stack `n_layers` deep-sigmoidal-flow layers of `K_flow` units each (see
+    `_ddsf_transform`), and `ddsf_skip` holds, for every layer after the first, the
+    already-activated convex combination weighting that layer's input between the
+    original noise and the previous layer's output -- the dense connectivity that
+    distinguishes DDSF from plainly stacking `FlowParams`-style DSF layers.
+    """
+
+    mu: Tensor  # [B, H, Nb]
+    sigma: Tensor  # [B, H, Nb]
+    ddsf_w: Tensor  # [B, H, Nb, n_layers, K_flow], positive, sums to 1 along K_flow
+    ddsf_a: Tensor  # [B, H, Nb, n_layers, K_flow], positive
+    ddsf_b: Tensor  # [B, H, Nb, n_layers, K_flow]
+    ddsf_skip: Tensor  # [B, H, Nb, n_layers-1, 2], positive, sums to 1 along the last axis
+    F: Tensor  # [B, H, Nb, K]
+
+
+@dataclass(frozen=True)
 class CopulaSplineParams:
     """Gaussian-copula factor-model parameters with a learned per-series spline marginal.
 
@@ -180,8 +201,8 @@ class Decoder(Protocol):
 
 
 class Head(Protocol):
-    """[B, Nb, H, D'] -> FactorParams, SkewTParams, FlowParams, CopulaSplineParams,
-    CopulaFlowParams or GMMParams."""
+    """[B, Nb, H, D'] -> FactorParams, SkewTParams, FlowParams, DDSFParams,
+    CopulaSplineParams, CopulaFlowParams or GMMParams."""
 
     def __call__(
         self, z: Tensor
@@ -189,6 +210,7 @@ class Head(Protocol):
         FactorParams
         | SkewTParams
         | FlowParams
+        | DDSFParams
         | CopulaSplineParams
         | CopulaFlowParams
         | GMMParams

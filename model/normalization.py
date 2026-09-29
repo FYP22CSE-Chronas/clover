@@ -8,6 +8,7 @@ from torch import Tensor
 from contracts import (
     CopulaFlowParams,
     CopulaSplineParams,
+    DDSFParams,
     FactorParams,
     FlowParams,
     GMMParams,
@@ -98,6 +99,7 @@ def denormalize_params(
         FactorParams
         | SkewTParams
         | FlowParams
+        | DDSFParams
         | CopulaSplineParams
         | CopulaFlowParams
         | GMMParams
@@ -107,6 +109,7 @@ def denormalize_params(
     FactorParams
     | SkewTParams
     | FlowParams
+    | DDSFParams
     | CopulaSplineParams
     | CopulaFlowParams
     | GMMParams
@@ -114,10 +117,10 @@ def denormalize_params(
     """Push (loc, scale) back onto mu/sigma/F so samples land in raw units.
 
     Every factor model is affine in mu/sigma/F, so this inverse is exact. A skew-t's
-    `nu`/`lam`, a flow's `flow_w`/`flow_a`/`flow_b`, a copula spline's or copula
-    flow's `spline_w`/`spline_h`/`spline_d` (and, for the latter, `flow_w`/`flow_a`/
-    `flow_b` too), and a mixture's `logits` are scale-free and pass through
-    unchanged.
+    `nu`/`lam`, a flow's `flow_w`/`flow_a`/`flow_b`, a DDSF's `ddsf_w`/`ddsf_a`/
+    `ddsf_b`/`ddsf_skip`, a copula spline's or copula flow's `spline_w`/`spline_h`/
+    `spline_d` (and, for the latter, `flow_w`/`flow_a`/`flow_b` too), and a mixture's
+    `logits` are scale-free and pass through unchanged.
     """
     if isinstance(params, SkewTParams):
         return SkewTParams(
@@ -125,6 +128,16 @@ def denormalize_params(
             sigma=params.sigma * stats.scale,
             nu=params.nu,
             lam=params.lam,
+            F=params.F * stats.scale.unsqueeze(-1),
+        )
+    if isinstance(params, DDSFParams):
+        return DDSFParams(
+            mu=params.mu * stats.scale + stats.loc,
+            sigma=params.sigma * stats.scale,
+            ddsf_w=params.ddsf_w,
+            ddsf_a=params.ddsf_a,
+            ddsf_b=params.ddsf_b,
+            ddsf_skip=params.ddsf_skip,
             F=params.F * stats.scale.unsqueeze(-1),
         )
     if isinstance(params, FlowParams):

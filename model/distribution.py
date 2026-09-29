@@ -6,6 +6,7 @@ from torch import Tensor
 from contracts import (
     CopulaFlowParams,
     CopulaSplineParams,
+    DDSFParams,
     FactorParams,
     FlowParams,
     ForecastSamples,
@@ -144,6 +145,84 @@ def sample_flow_factor_model(
 
     z = torch.randn(*lead, n_bottom, num_samples, **kw)
     t = _dsf_transform(z, w, a, b)
+
+    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
+    return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * t + factor_term
+
+
+def _ddsf_transform(x: Tensor, w: Tensor, a: Tensor, b: Tensor, skip: Tensor) -> Tensor:
+    """Deep dense sigmoidal flow (Huang et al. 2018): `n_layers` stacked
+    `_dsf_transform` layers with dense connectivity back to the original input.
+
+    `w`/`a`/`b` carry a trailing `[n_layers, K_flow]` axis (already activated by the
+    caller, see `model.heads._flow_shape` applied per layer); `skip` carries a
+    trailing `[n_layers - 1, 2]` axis -- a convex combination (already softmaxed by
+    the caller) over `[x, previous layer's output]` that mixes them into each later
+    layer's input, the "dense" part of the construction. The first layer has no
+    previous output, so it always runs directly on `x`. Every `_dsf_transform` layer
+    is a strictly increasing function of its input, and a convex combination (both
+    weights positive, summing to 1) of two strictly increasing functions of `x` is
+    itself strictly increasing in `x`; composing strictly increasing functions stays
+    strictly increasing, so the whole stack is an invertible warp end to end, though
+    -- exactly as in `_dsf_transform` -- only this forward direction is ever
+    evaluated.
+    """
+    n_layers = w.shape[-2]
+    out = _dsf_transform(x, w[..., 0, :], a[..., 0, :], b[..., 0, :])
+    for layer in range(1, n_layers):
+        mix = skip[..., layer - 1, :]
+        x_weight = mix[..., 0].unsqueeze(-1)
+        prev_weight = mix[..., 1].unsqueeze(-1)
+        layer_in = x_weight * x + prev_weight * out
+        out = _dsf_transform(
+            layer_in, w[..., layer, :], a[..., layer, :], b[..., layer, :]
+        )
+    return out
+
+
+def sample_ddsf_factor_model(
+    params: DDSFParams, num_samples: int, generator: torch.Generator | None = None
+) -> Tensor:
+    """Draw `mu + sigma * t + F @ eps`, `t` a deep-dense-sigmoidal-flow innovation.
+
+    `t = ddsf(z; ddsf_w, ddsf_a, ddsf_b, ddsf_skip)` (see `_ddsf_transform`) warps a
+    standard normal `z` through `n_layers` stacked, densely-connected deep-sigmoidal-
+    flow layers instead of `sample_flow_factor_model`'s single layer, letting the
+    innovation's shape compose more structure than one layer's `K_flow` sigmoid units
+    can represent. Reparameterized through `z` exactly like `sample_factor_model`, so
+    `generator` reproduces draws and gradients reach every flow parameter.
+    """
+    mu, sigma, loadings = params.mu, params.sigma, params.F
+    w, a, b, skip = params.ddsf_w, params.ddsf_a, params.ddsf_b, params.ddsf_skip
+    if mu.shape != sigma.shape:
+        raise ValueError(f"mu {tuple(mu.shape)} and sigma {tuple(sigma.shape)} differ")
+    if not (w.shape == a.shape == b.shape):
+        raise ValueError(
+            f"ddsf_w {tuple(w.shape)}, ddsf_a {tuple(a.shape)} and ddsf_b "
+            f"{tuple(b.shape)} must all match"
+        )
+    if w.shape[:-2] != mu.shape:
+        raise ValueError(
+            f"ddsf parameter leading dims {tuple(w.shape[:-2])} must match mu "
+            f"{tuple(mu.shape)}"
+        )
+    if skip.shape[:-2] != mu.shape or skip.shape[-2] != w.shape[-2] - 1:
+        raise ValueError(
+            f"ddsf_skip {tuple(skip.shape)} must hold {w.shape[-2] - 1} mixing "
+            f"weights for {w.shape[-2]} layers, leading dims matching mu "
+            f"{tuple(mu.shape)}"
+        )
+    if loadings.shape[:-1] != mu.shape:
+        raise ValueError(
+            f"F leading dims {tuple(loadings.shape[:-1])} must match mu {tuple(mu.shape)}"
+        )
+    lead, n_bottom = mu.shape[:-1], mu.shape[-1]
+    n_factors = loadings.shape[-1]
+    kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
+
+    z = torch.randn(*lead, n_bottom, num_samples, **kw)
+    t = _ddsf_transform(z, w, a, b, skip)
 
     eps = torch.randn(*lead, n_factors, num_samples, **kw)
     factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
@@ -380,6 +459,7 @@ def sample_coherent(
         FactorParams
         | SkewTParams
         | FlowParams
+        | DDSFParams
         | CopulaSplineParams
         | CopulaFlowParams
         | GMMParams
@@ -393,12 +473,15 @@ def sample_coherent(
 
     Dispatches on `params`' type: `FactorParams` draws Gaussian factor-model
     samples, `SkewTParams` draws skew-t samples, `FlowParams` draws normalizing-
-    flow samples, `CopulaSplineParams` draws Gaussian-copula spline-marginal
-    samples, `CopulaFlowParams` draws Gaussian-copula spline-then-flow samples,
-    `GMMParams` draws Gaussian-mixture samples.
+    flow samples, `DDSFParams` draws deep-dense-sigmoidal-flow samples,
+    `CopulaSplineParams` draws Gaussian-copula spline-marginal samples,
+    `CopulaFlowParams` draws Gaussian-copula spline-then-flow samples, `GMMParams`
+    draws Gaussian-mixture samples.
     """
     if isinstance(params, SkewTParams):
         sampler = sample_skew_t_factor_model
+    elif isinstance(params, DDSFParams):
+        sampler = sample_ddsf_factor_model
     elif isinstance(params, FlowParams):
         sampler = sample_flow_factor_model
     elif isinstance(params, CopulaFlowParams):

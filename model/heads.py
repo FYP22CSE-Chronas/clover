@@ -8,6 +8,7 @@ from torch import Tensor
 from contracts import (
     CopulaFlowParams,
     CopulaSplineParams,
+    DDSFParams,
     FactorParams,
     FlowParams,
     GMMParams,
@@ -218,6 +219,89 @@ class NormalizingFlowSharedHead(nn.Module):
             flow_w=flow_w.expand(shape),
             flow_a=flow_a.expand(shape),
             flow_b=flow_b.expand(shape),
+            F=loadings,
+        )
+
+    def _sigma(self, sigma_raw: Tensor) -> Tensor:
+        """Positivity constraint on the predicted scale."""
+        if self.sigma_activation == "softplus":
+            return F.softplus(sigma_raw) + self.sigma_eps
+        return torch.exp(sigma_raw.clamp(max=20.0)) + self.sigma_eps
+
+
+@HEADS.register("ddsf")
+class DDSFHead(nn.Module):
+    """Emits 2 + n_layers*3*K_flow + (n_layers-1)*2 + K values per (series, horizon):
+    mu, raw sigma, `n_layers` stacked deep-sigmoidal-flow layers (raw weight/slope/
+    shift each, K_flow units per layer), raw dense-skip mixing weights for every
+    layer after the first, and K loadings.
+
+    Generalizes `NormalizingFlowHead`'s single DSF layer into `n_layers` layers with
+    dense connectivity back to the original noise (see `_ddsf_transform`), following
+    Huang et al. 2018's deep dense sigmoidal flow: more layers let the learned
+    innovation shape compose structure a single layer's `K_flow` sigmoid units
+    cannot reach, at the cost of `n_layers` times the shape parameters to fit.
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        n_factors: int,
+        sigma_activation: str = "softplus",
+        sigma_eps: float = 1e-3,
+        n_flow_components: int = 8,
+        a_floor: float = 0.1,
+        n_flow_layers: int = 3,
+    ) -> None:
+        super().__init__()
+        if n_flow_components < 1:
+            raise ValueError(f"n_flow_components must be >= 1, got {n_flow_components}")
+        if n_flow_layers < 1:
+            raise ValueError(f"n_flow_layers must be >= 1, got {n_flow_layers}")
+        self.n_factors = n_factors
+        self.sigma_activation = sigma_activation
+        self.sigma_eps = sigma_eps
+        self.n_flow_components = n_flow_components
+        self.a_floor = a_floor
+        self.n_flow_layers = n_flow_layers
+        n_skip = max(n_flow_layers - 1, 0)
+        flow_dim = n_flow_layers * 3 * n_flow_components + n_skip * 2
+        self.proj = MLPBlock(in_dim, 2 + flow_dim + n_factors)
+
+    def forward(self, z: Tensor) -> DDSFParams:
+        """[B, Nb, H, D] -> mu/sigma [B, H, Nb], ddsf params/loadings [B, H, Nb, *]."""
+        k, layers = self.n_flow_components, self.n_flow_layers
+        n_skip = max(layers - 1, 0)
+        params = self.proj(z)
+        mu = params[..., 0].permute(0, 2, 1)
+        sigma_raw = params[..., 1].permute(0, 2, 1)
+
+        i = 2
+        w_raw = params[..., i : i + layers * k].permute(0, 2, 1, 3)
+        i += layers * k
+        a_raw = params[..., i : i + layers * k].permute(0, 2, 1, 3)
+        i += layers * k
+        b_raw = params[..., i : i + layers * k].permute(0, 2, 1, 3)
+        i += layers * k
+        skip_raw = params[..., i : i + n_skip * 2].permute(0, 2, 1, 3)
+        i += n_skip * 2
+        loadings = params[..., i:].permute(0, 2, 1, 3)
+
+        lead = w_raw.shape[:-1]
+        w_raw = w_raw.reshape(*lead, layers, k)
+        a_raw = a_raw.reshape(*lead, layers, k)
+        b_raw = b_raw.reshape(*lead, layers, k)
+        skip_raw = skip_raw.reshape(*lead, n_skip, 2)
+
+        ddsf_w, ddsf_a, ddsf_b = _flow_shape(w_raw, a_raw, b_raw, self.a_floor)
+        ddsf_skip = torch.softmax(skip_raw, dim=-1)
+        return DDSFParams(
+            mu=mu,
+            sigma=self._sigma(sigma_raw),
+            ddsf_w=ddsf_w,
+            ddsf_a=ddsf_a,
+            ddsf_b=ddsf_b,
+            ddsf_skip=ddsf_skip,
             F=loadings,
         )
 

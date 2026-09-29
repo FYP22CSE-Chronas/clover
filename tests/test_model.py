@@ -404,6 +404,59 @@ def test_copula_flow_head_gradients_reach_every_parameter(S: np.ndarray) -> None
     assert not missing, f"no gradient reached {missing}"
 
 
+def test_ddsf_head_forward_shapes(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="ddsf"), dims, S)
+    params = model(_batch(model.n_bottom))
+    k_flow, n_layers = model.head.n_flow_components, model.head.n_flow_layers
+    assert params.mu.shape == (B, H, model.n_bottom)
+    assert params.sigma.shape == (B, H, model.n_bottom)
+    assert params.ddsf_w.shape == (B, H, model.n_bottom, n_layers, k_flow)
+    assert params.ddsf_a.shape == (B, H, model.n_bottom, n_layers, k_flow)
+    assert params.ddsf_b.shape == (B, H, model.n_bottom, n_layers, k_flow)
+    assert params.ddsf_skip.shape == (B, H, model.n_bottom, n_layers - 1, 2)
+    assert params.F.shape == (B, H, model.n_bottom, model.config.n_factors)
+    assert (params.sigma > 0).all()
+    assert (params.ddsf_a > model.head.a_floor).all()
+    torch.testing.assert_close(
+        params.ddsf_w.sum(-1), torch.ones(B, H, model.n_bottom, n_layers)
+    )
+    torch.testing.assert_close(
+        params.ddsf_skip.sum(-1), torch.ones(B, H, model.n_bottom, n_layers - 1)
+    )
+
+
+def test_ddsf_head_rejects_fewer_than_one_component() -> None:
+    with pytest.raises(ValueError, match="n_flow_components must be >= 1"):
+        from model.heads import DDSFHead
+
+        DDSFHead(in_dim=4, n_factors=2, n_flow_components=0)
+
+
+def test_ddsf_head_rejects_fewer_than_one_layer() -> None:
+    with pytest.raises(ValueError, match="n_flow_layers must be >= 1"):
+        from model.heads import DDSFHead
+
+        DDSFHead(in_dim=4, n_factors=2, n_flow_layers=0)
+
+
+def test_ddsf_head_gradients_reach_every_parameter(S: np.ndarray) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="ddsf"), dims, S)
+    params = model(_batch(model.n_bottom))
+    total = (
+        params.mu.sum()
+        + params.sigma.sum()
+        + params.ddsf_w.sum()
+        + params.ddsf_a.sum()
+        + params.ddsf_b.sum()
+        + params.ddsf_skip.sum()
+    )
+    (total + params.F.sum()).backward()
+    missing = [n for n, p in model.named_parameters() if p.grad is None]
+    assert not missing, f"no gradient reached {missing}"
+
+
 def test_gmm_head_forward_shapes(S: np.ndarray) -> None:
     dims = ModelDims(h=H, input_size=L)
     model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, head="gmm"), dims, S)

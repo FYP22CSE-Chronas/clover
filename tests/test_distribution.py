@@ -7,12 +7,14 @@ import torch
 from contracts import (
     CopulaFlowParams,
     CopulaSplineParams,
+    DDSFParams,
     FactorParams,
     FlowParams,
     GMMParams,
     SkewTParams,
 )
 from model.distribution import (
+    _ddsf_transform,
     _dsf_transform,
     _rational_quadratic_spline,
     aggregate_targets,
@@ -20,6 +22,7 @@ from model.distribution import (
     sample_coherent,
     sample_copula_flow_factor_model,
     sample_copula_spline_factor_model,
+    sample_ddsf_factor_model,
     sample_factor_model,
     sample_flow_factor_model,
     sample_gmm_factor_model,
@@ -242,6 +245,101 @@ def test_dsf_transform_is_strictly_increasing() -> None:
     a = torch.rand(1, 1, 1, 6) + 0.1
     b = torch.randn(1, 1, 1, 6)
     t = _dsf_transform(grid, w, a, b)
+    assert (t.diff(dim=-1) > 0).all()
+
+
+N_LAYERS = 3
+
+
+def _ddsf_params(n_bottom: int) -> DDSFParams:
+    return DDSFParams(
+        mu=torch.randn(B, H, n_bottom),
+        sigma=torch.rand(B, H, n_bottom) + 0.1,
+        ddsf_w=torch.softmax(torch.randn(B, H, n_bottom, N_LAYERS, K_FLOW), dim=-1),
+        ddsf_a=torch.rand(B, H, n_bottom, N_LAYERS, K_FLOW) + 0.1,
+        ddsf_b=torch.randn(B, H, n_bottom, N_LAYERS, K_FLOW),
+        ddsf_skip=torch.softmax(torch.randn(B, H, n_bottom, N_LAYERS - 1, 2), dim=-1),
+        F=torch.randn(B, H, n_bottom, K) * 0.1,
+    )
+
+
+def test_ddsf_sample_shape(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    samples = sample_ddsf_factor_model(_ddsf_params(n_bottom), num_samples=16)
+    assert samples.shape == (B, H, n_bottom, 16)
+
+
+def test_ddsf_samples_are_coherent(S: np.ndarray) -> None:
+    S_t = torch.as_tensor(S)
+    draws = sample_coherent(_ddsf_params(S.shape[1]), S_t, num_samples=32)
+    expected = torch.einsum("ij,bhjn->bhin", S_t, torch.relu(draws.bottom))
+    torch.testing.assert_close(draws.hierarchy, expected)
+
+
+def test_ddsf_generator_makes_sampling_reproducible(S: np.ndarray) -> None:
+    params = _ddsf_params(S.shape[1])
+    a = sample_ddsf_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    b = sample_ddsf_factor_model(params, 8, generator=torch.Generator().manual_seed(7))
+    torch.testing.assert_close(a, b)
+
+
+def test_ddsf_rejects_mismatched_shape_params(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _ddsf_params(n_bottom)
+    bad = DDSFParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        ddsf_w=params.ddsf_w[..., :-1],
+        ddsf_a=params.ddsf_a,
+        ddsf_b=params.ddsf_b,
+        ddsf_skip=params.ddsf_skip,
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="must all match"):
+        sample_ddsf_factor_model(bad, num_samples=4)
+
+
+def test_ddsf_rejects_mismatched_skip_layers(S: np.ndarray) -> None:
+    n_bottom = S.shape[1]
+    params = _ddsf_params(n_bottom)
+    bad = DDSFParams(
+        mu=params.mu,
+        sigma=params.sigma,
+        ddsf_w=params.ddsf_w,
+        ddsf_a=params.ddsf_a,
+        ddsf_b=params.ddsf_b,
+        ddsf_skip=params.ddsf_skip[..., :-1, :],
+        F=params.F,
+    )
+    with pytest.raises(ValueError, match="ddsf_skip"):
+        sample_ddsf_factor_model(bad, num_samples=4)
+
+
+def test_ddsf_transform_with_one_layer_matches_dsf_transform() -> None:
+    """A single-layer DDSF has no skip mixing to apply, so it is exactly the
+    single-layer `_dsf_transform` it generalizes."""
+    torch.manual_seed(0)
+    x = torch.randn(2, 3, 4, 5) * 0.5
+    w = torch.softmax(torch.randn(2, 3, 4, 1, K_FLOW), dim=-1)
+    a = torch.rand(2, 3, 4, 1, K_FLOW) + 0.1
+    b = torch.randn(2, 3, 4, 1, K_FLOW)
+    skip = torch.zeros(2, 3, 4, 0, 2)
+    t = _ddsf_transform(x, w, a, b, skip)
+    expected = _dsf_transform(x, w[..., 0, :], a[..., 0, :], b[..., 0, :])
+    torch.testing.assert_close(t, expected)
+
+
+def test_ddsf_transform_is_strictly_increasing() -> None:
+    """Every layer is strictly increasing and each later layer's input is a convex
+    combination of the (strictly increasing) original `x` and the previous layer's
+    (strictly increasing) output, so the whole stack stays strictly increasing."""
+    torch.manual_seed(0)
+    grid = torch.linspace(-2.0, 2.0, 50).reshape(1, 1, 1, 50)
+    w = torch.softmax(torch.randn(1, 1, 1, N_LAYERS, 6), dim=-1)
+    a = torch.rand(1, 1, 1, N_LAYERS, 6) + 0.1
+    b = torch.randn(1, 1, 1, N_LAYERS, 6)
+    skip = torch.softmax(torch.randn(1, 1, 1, N_LAYERS - 1, 2), dim=-1)
+    t = _ddsf_transform(grid, w, a, b, skip)
     assert (t.diff(dim=-1) > 0).all()
 
 

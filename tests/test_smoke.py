@@ -126,6 +126,17 @@ def test_copula_flow_head_end_to_end_run_produces_finite_scores() -> None:
     assert result.history.steps_run == QUICK["max_steps"]
 
 
+def test_ddsf_head_end_to_end_run_produces_finite_scores() -> None:
+    """The deep-dense-sigmoidal-flow head trains through the same pipeline as the
+    default."""
+    config = quick("tourism_small")
+    config = replace(config, model=replace(config.model, head="ddsf"))
+    result = run(config, seed=0, verbose=False)
+    assert set(result.scrps) >= {"Overall"}
+    assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
+    assert result.history.steps_run == QUICK["max_steps"]
+
+
 def test_gmm_head_end_to_end_run_produces_finite_scores() -> None:
     """The Gaussian-mixture head trains through the same pipeline as the default."""
     config = quick("tourism_small")
