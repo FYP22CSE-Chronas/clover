@@ -1,0 +1,14 @@
+# Example EC-CLOVER config for the labour dataset using a Johansen-informed beta.
+# 1) python -m experiments.ec_clover.scripts.estimate_beta --dataset labour --rank 2 \
+#      --out experiments/ec_clover/artifacts/labour_beta.npy
+# 2) python -m experiments.ec_clover.cli --dataset labour \
+#      --ec-config experiments/ec_clover/configs/labour.yaml
+ec:
+  enabled: true
+  rank: 2
+  encoder: dilated_conv
+  encoder_channels: 8
+  alpha_init_std: 0.01
+  beta_init:
+    type: johansen
+    values_path: experiments/ec_clover/artifacts/labour_beta.npy

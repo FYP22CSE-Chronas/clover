@@ -1,0 +1,16 @@
+# EC-CLOVER config for the traffic dataset.
+#
+# Nb=200 bottom-level series vs ~120 training rows makes Johansen's regression step
+# rank-deficient (T < Nb), so beta uses random unit-norm init here, same as
+# tourism_small.yaml, rather than the Johansen path used for labour.
+#
+# Usage: python -m experiments.ec_clover.cli --dataset traffic \
+#          --ec-config experiments/ec_clover/configs/traffic.yaml
+ec:
+  enabled: true
+  rank: 2
+  encoder: dilated_conv
+  encoder_channels: 8
+  alpha_init_std: 0.01
+  beta_init:
+    type: random

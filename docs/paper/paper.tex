@@ -1,0 +1,1008 @@
+% Compile: pdflatex paper && bibtex paper && pdflatex paper && pdflatex paper
+%
+% FIRST DRAFT. Every number in every table was extracted from this repository's own
+% result files; the extraction commands are recorded in docs/paper/ANALYSIS.md.
+% Cells marked [RESULT REQUIRED] have no supporting run on disk. Claims marked
+% [NEEDS VERIFICATION] are inferences that the repository does not settle.
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\newcommand{\todo}[1]{\textcolor{red}{[#1]}}
+\newcommand{\Nb}{N_{b}}
+\newcommand{\Na}{N_{a}}
+\newcommand{\bvec}{\mathbf{b}}
+\newcommand{\yvec}{\mathbf{y}}
+\newcommand{\Smat}{\mathbf{S}}
+\newcommand{\Fmat}{\mathbf{F}}
+\newcommand{\Real}{\mathbb{R}}
+\newcommand{\Exp}{\mathbb{E}}
+
+\title{Learned Marginals in a Coherent Hierarchical Forecaster:\\
+Where a Conditional Normalizing Flow Helps, and Where It Does Not}
+
+\author{\todo{author list}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+CLOVER produces coherent probabilistic forecasts for hierarchical time series by
+sampling a Gaussian factor model at the bottom level and aggregating every draw
+through the summation matrix, so that coherence holds by construction and the
+scoring rule can be optimised directly. The construction fixes the bottom-level
+marginal to be Gaussian. We replace that fixed marginal with a learned one: a
+conditional deep sigmoidal flow whose weights, slopes and shifts are emitted per
+series and per horizon by the same head that emits the location, scale and factor
+loadings, leaving the encoder, mixer, decoder, aggregation step and training
+objective untouched. We also evaluate a second, copula-correct placement of the
+same idea, in which a monotonic rational-quadratic spline warps the entire
+correlated draw rather than only its idiosyncratic component, so that rank
+correlation is provably preserved. On seven public hierarchies with twelve
+matched seeds per configuration, the flow head lowers overall scaled CRPS on five
+of six datasets, significantly at the $5\%$ level on three of them (labour
+$-1.8\%$, prison $-7.3\%$, tourism-small $-6.6\%$; paired Wilcoxon), and raises
+it on traffic by $5.9\%$. The spline head lowers it on four of seven,
+significantly on two, and its wins are on a largely disjoint set of datasets from
+the flow's. We then test the motivation itself. Using seasonal-naive
+standardised residuals, an omnibus normality test rejects the Gaussian
+hypothesis for between $10.7\%$ and $100\%$ of bottom-level series depending on
+the dataset, with excess kurtosis rather than skewness the dominant departure.
+The association between that measured departure and the flow's benefit is
+positive (Spearman $\rho=+0.89$, $p=0.019$, $n=6$ datasets) --- that is, the
+learned marginal helps \emph{least} where the Gaussian assumption is most
+violated, the opposite of the motivating hypothesis. We show that the
+implementation explains part of this: because the flow warps only the
+idiosyncratic component and a Gaussian factor term is added afterwards, the
+bottom-level marginal is a convolution of a warped Gaussian with a Gaussian, and
+the non-Gaussian shape is progressively undone as the factor term's variance
+share grows. We report the result as mixed and dataset-dependent, identify the
+confounds that seven datasets cannot separate, and list the experiments needed
+before the finding can be called conclusive.
+\end{abstract}
+
+\section{Introduction}
+
+Hierarchical time series arise wherever a quantity is reported at several levels of
+aggregation at once: tourism by country, state and region; retail sales by item,
+store and chain; traffic by lane, carriageway and road. Forecasts of such a
+collection are \emph{coherent} when the forecast of every aggregate equals the sum
+of the forecasts of its components. Coherence is an operational requirement, not an
+aesthetic one: a plan built on incoherent forecasts allocates resources that do not
+add up.
+
+Classical work achieves coherence by \emph{reconciliation} --- forecast each series
+independently, then project the vector of base forecasts onto the coherent subspace
+\citep{hyndman2011optimal,wickramasuriya2019optimal}. Probabilistic reconciliation
+extends this to distributions \citep{taieb2017coherent,panagiotelis2023probabilistic},
+and a line of neural work instead makes coherence structural, so that no projection
+step is needed \citep{rangapuram2021endtoend,olivares2024clover}.
+
+CLOVER \citep{olivares2024clover} belongs to the second group. It predicts, for
+each bottom-level series and each horizon step, a location $\mu$, a scale $\sigma$
+and a vector of $K$ factor loadings, then draws samples by reparameterisation,
+\begin{equation}
+\bvec = \mu + \sigma \odot z + \Fmat\,\varepsilon ,
+\qquad z \sim \mathcal{N}(0, I), \quad \varepsilon \sim \mathcal{N}(0, I_K),
+\label{eq:clover-sample}
+\end{equation}
+and aggregates each draw through the fixed summation matrix. Every draw is
+therefore coherent, and because the draw is differentiable in the parameters, the
+scoring rule can be minimised on the aggregated distribution directly rather than
+reconciled afterwards.
+
+Equation~\eqref{eq:clover-sample} makes the bottom-level predictive distribution
+Gaussian --- exactly Gaussian, with a covariance that is diagonal plus rank $K$.
+That is a strong assumption about the shape of a predictive distribution, and the
+literature on non-hierarchical probabilistic forecasting has largely moved away
+from it, through copulas with learned marginals \citep{salinas2019copula} and
+through normalizing flows \citep{rasul2021multivariate}. The natural question is
+whether the same move pays inside a coherent-by-construction hierarchical model,
+where the Gaussian assumption is doing structural work: it is what makes the
+factor term a clean, low-rank description of cross-series dependence.
+
+\paragraph{Research question.} Can replacing CLOVER's fixed Gaussian marginal with
+a learned conditional normalizing flow improve probabilistic forecasting accuracy
+for hierarchical time series, and is any improvement explained by the degree to
+which the data departs from normality?
+
+\paragraph{Contributions.} We do not claim that flows for hierarchical forecasting
+are new; Section~\ref{sec:related} documents at least three prior systems that
+combine the two. What we contribute is:
+\begin{enumerate}
+\item A \emph{controlled} substitution. We replace only the distribution head of a
+coherent-by-construction factor model and hold the encoder, cross-series mixer,
+decoder, exogenous features, optimiser, schedule, split, seeds and scoring
+procedure fixed, so that the measured difference is attributable to the marginal
+family and nothing else (Section~\ref{sec:method}).
+\item A distinction between two \emph{placements} of a learned marginal inside
+Equation~\eqref{eq:clover-sample} --- warping the idiosyncratic component $z$
+alone, versus warping the whole correlated draw $z + \Fmat\varepsilon$ --- with a
+proof-level argument that only the second preserves rank correlation, and evidence
+that the two win on largely disjoint datasets (Sections~\ref{sec:method}
+and~\ref{sec:results}).
+\item A structural analysis showing that the first placement partially undoes its
+own effect, because an additive Gaussian factor term convolves the warped marginal
+back toward a Gaussian at a rate set by the factor term's variance share
+(Section~\ref{sec:convolution}).
+\item A measurement of the non-Gaussianity that motivates the method, and the
+negative finding that it does not predict where the method helps
+(Section~\ref{sec:nongauss}).
+\end{enumerate}
+
+\section{Background}
+
+\subsection{Hierarchical time series}
+Let the hierarchy have $\Nb$ bottom-level series and $\Na$ aggregates. Stack them as
+$\yvec_t \in \Real^{\Na+\Nb}$ and let $\bvec_t \in \Real^{\Nb}$ hold the bottom level.
+A summation matrix $\Smat \in \Real^{(\Na+\Nb)\times \Nb}$ encodes the structure, and
+in this implementation is always in the form $\Smat = [\mathbf{A}; I_{\Nb}]$, so that
+\begin{equation}
+\yvec_t = \Smat\,\bvec_t .
+\end{equation}
+A forecast distribution is coherent when it is supported on $\{\Smat \bvec : \bvec \in
+\Real^{\Nb}\}$.
+
+\subsection{Probabilistic forecasting and the scoring rule}
+We evaluate with the continuous ranked probability score, a strictly proper scoring
+rule for a univariate predictive distribution \citep{gneiting2007strictly}. Given a
+predictive sample $\{x^{(n)}\}_{n=1}^{N}$ and an observation $y$, the unbiased
+$U$-statistic estimator used for training is
+\begin{equation}
+\widehat{\mathrm{CRPS}}\bigl(y, \{x^{(n)}\}\bigr)
+= \frac{1}{N}\sum_{n=1}^{N}\bigl|x^{(n)} - y\bigr|
+- \frac{1}{2N(N-1)}\sum_{n=1}^{N}\sum_{m=1}^{N}\bigl|x^{(n)} - x^{(m)}\bigr| ,
+\label{eq:crps-mc}
+\end{equation}
+which the implementation computes in $O(N \log N)$ via the sorted identity rather than
+by forming the pairwise matrix \citep{zamo2018crps}. For reporting we use the
+quantile-integral estimator on a $1\%$ grid, twice the mean pinball loss over
+$q \in \{0.01,\dots,0.99\}$; the two estimators differ, and the repository's tests
+pin the difference.
+
+Following \citet{olivares2024clover} we report \emph{scaled} CRPS per aggregation
+level $\ell$: the level's total CRPS divided by its total absolute target mass,
+\begin{equation}
+\mathrm{sCRPS}(\ell)
+= \frac{\sum_{i \in \ell}\sum_{\tau=1}^{h}\mathrm{CRPS}_{i,\tau}}
+       {\sum_{i \in \ell}\sum_{\tau=1}^{h}\bigl|y_{i,\tau}\bigr|} .
+\label{eq:scrps}
+\end{equation}
+This is a ratio of sums, not a mean of ratios, so a level dominated by one large
+series is dominated by that series' CRPS too. ``Overall'' applies
+Equation~\eqref{eq:scrps} with $\ell$ the whole hierarchy.
+
+\subsection{Normalizing flows}
+A normalizing flow expresses a density as a diffeomorphic push-forward of a simple
+base density \citep{rezende2015nf,papamakarios2021nf}. If $z \sim p_Z$ and
+$x = T_\phi(z)$ with $T_\phi$ invertible and differentiable, then
+\begin{equation}
+\log p_X(x) = \log p_Z\bigl(T^{-1}_\phi(x)\bigr)
++ \log\Bigl|\det \frac{\partial T^{-1}_\phi(x)}{\partial x}\Bigr| .
+\label{eq:cov}
+\end{equation}
+Equation~\eqref{eq:cov} is the standard route to \emph{maximum-likelihood} training
+of a flow. We state it here only to make clear that \textbf{our method does not use
+it}: the objective is Equation~\eqref{eq:crps-mc}, a scoring rule on samples, so the
+model is used purely as a differentiable simulator. Only the forward direction
+$z \mapsto T_\phi(z)$ is ever evaluated, and neither the inverse nor the
+log-determinant is implemented. Section~\ref{sec:limitations} discusses what this
+costs.
+
+For the transform we use the \emph{deep sigmoidal flow} (DSF) of
+\citet{huang2018naf}, a convex combination of logistic sigmoids composed with a
+logit link, and for the second placement the monotonic rational-quadratic spline of
+\citet{durkan2019nsf}.
+
+\section{Problem formulation}
+
+Fix a forecast creation time $t$. The model sees the bottom-level history
+$Y = \bvec_{t-L:t} \in \Real^{L \times \Nb}$ together with static and known-future
+covariates, and must emit a joint predictive distribution over the full hierarchy
+$\yvec_{t:t+h} \in \Real^{h \times (\Na+\Nb)}$ that is (i) coherent and (ii) scores
+well under Equation~\eqref{eq:scrps}.
+
+Write $q_\theta$ for the bottom-level predictive law induced by the model's
+parameters $\theta$. CLOVER restricts $q_\theta$ to the Gaussian family
+$\mathcal{N}\bigl(\mu, \mathrm{diag}(\sigma^2) + \Fmat\Fmat^{\!\top}\bigr)$ at each
+horizon step. Our question is what happens when the \emph{marginal} of $q_\theta$ is
+allowed to leave that family while the low-rank dependence structure and the
+coherence mechanism are retained. We are careful throughout to distinguish:
+\begin{itemize}
+\item the \textbf{marginal} law of one bottom series at one horizon step;
+\item the \textbf{joint} law over the $\Nb$ bottom series at one horizon step, whose
+dependence is what the factor loadings encode;
+\item \textbf{coherence}, a support constraint on the aggregated law, which in this
+architecture is a property of each individual draw and therefore holds for any
+marginal family.
+\end{itemize}
+
+\section{Method}
+\label{sec:method}
+
+\subsection{The baseline, as implemented}
+We describe the architecture as it exists in the repository, which is the object our
+experiments actually vary.
+
+\paragraph{Per-window normalisation.} From the insample block only, a location and
+scale are computed per series, $\ell_j = \mathrm{mean}_t Y_{tj}$ and
+$s_j = \mathrm{std}_t Y_{tj} + \epsilon$, and the window is standardised,
+$\tilde{Y} = (Y - \ell)/s$. The horizon is never used to compute them. Two of the
+eight configurations use a scale-only variant for sparse count data.
+
+\paragraph{Encoder.} The standardised history is lifted to every hierarchy row,
+$\tilde{Y}^{\mathrm{hier}} = \Smat \tilde{Y}^{\!\top} \in \Real^{(\Na+\Nb) \times L}$,
+and passed through a left-padded dilated causal convolution stack with weights shared
+across rows, returning the last step: $H^{\mathrm{enc}} \in \Real^{(\Na+\Nb)\times C}$.
+Aggregate rows are encoded, not just bottom rows.
+
+\paragraph{Cross-series mixer.} Because $\Smat = [\mathbf{A}; I]$, the trailing $\Nb$
+rows of $H^{\mathrm{enc}}$ are the bottom series themselves, and the mixer is residual
+about them:
+\begin{equation}
+h^{\mathrm{hist}} = H^{\mathrm{enc}}_{[-\Nb:]}
++ \mathrm{MLP}\bigl(\mathrm{vec}(H^{\mathrm{enc}})\bigr)
+\in \Real^{\Nb \times C}.
+\end{equation}
+Setting the mixer's hidden width to zero disables the second term; one of the seven
+configurations (labour) does so.
+
+\paragraph{Decoder.} Static and future covariate embeddings are concatenated onto
+$h^{\mathrm{hist}}$ to form a context $c_i$, and a two-stage decoder produces one
+feature vector per horizon step by concatenating a horizon-agnostic projection, a
+horizon-specific projection and the raw future covariates of that step:
+$z_{i,\tau} \in \Real^{D}$.
+
+\paragraph{Head.} A multilayer perceptron maps $z_{i,\tau}$ to the distribution
+parameters. For the Gaussian baseline it emits $2+K$ values,
+\begin{equation}
+\bigl(\mu_{i,\tau},\; \tilde\sigma_{i,\tau},\; \Fmat_{i,\tau,1:K}\bigr)
+= \mathrm{MLP}(z_{i,\tau}),
+\qquad
+\sigma_{i,\tau} = \mathrm{softplus}(\tilde\sigma_{i,\tau}) + \epsilon_\sigma .
+\end{equation}
+
+\paragraph{Denormalisation.} Because the factor model is affine in
+$(\mu, \sigma, \Fmat)$, the per-window standardisation is inverted exactly on the
+parameters rather than on the samples:
+$\mu \leftarrow \mu s + \ell$, $\sigma \leftarrow \sigma s$,
+$\Fmat \leftarrow \Fmat s$.
+
+\paragraph{Sampling and coherence.} Draws are taken as in
+Equation~\eqref{eq:clover-sample}, with $z_{i,\tau}^{(n)}$ independent across series
+and $\varepsilon^{(n)}_{\tau} \in \Real^{K}$ shared across series, so that
+\begin{equation}
+\mathrm{Cov}\bigl[\bvec_{\cdot,\tau}\bigr]
+= \mathrm{diag}(\sigma^{2}_{\cdot,\tau}) + \Fmat_{\cdot,\tau}\Fmat_{\cdot,\tau}^{\!\top} .
+\label{eq:cov-structure}
+\end{equation}
+Each draw is then clipped and aggregated, in that order:
+\begin{equation}
+\hat{\yvec}^{(n)}_{\tau} = \Smat \,\max\bigl(\bvec^{(n)}_{\tau}, 0\bigr).
+\label{eq:coherent}
+\end{equation}
+Equation~\eqref{eq:coherent} is the entire coherence mechanism, and it is applied
+identically for every head, so \emph{coherence is invariant to the choice of
+marginal family}. Clipping before aggregating, rather than after, is what keeps the
+aggregate equal to the sum of the values actually attributed to its children.
+
+\paragraph{Objective.} The loss is Equation~\eqref{eq:crps-mc} applied to the
+aggregated samples against the aggregated targets, summed over hierarchy rows and
+horizon steps, divided by the batch's total absolute target mass --- a minibatch
+surrogate for Equation~\eqref{eq:scrps}. Training uses $N=50$ Monte Carlo samples,
+validation up to $500$, and test $1000$.
+
+\subsection{Our modification: a conditional deep sigmoidal marginal}
+
+We replace the Gaussian innovation $z$ in Equation~\eqref{eq:clover-sample} with a
+learned monotone warp of it. The head is widened to emit $2 + 3K_f + K$ values,
+adding a per-$(i,\tau)$ triple of raw weights, slopes and shifts, activated as
+\begin{equation}
+w = \mathrm{softmax}(\tilde{w}) \in \Delta^{K_f-1},
+\qquad
+a = \mathrm{softplus}(\tilde{a}) + a_{\min},
+\qquad
+b = \tilde{b},
+\end{equation}
+so that $w$ is a convex combination and every slope is bounded away from zero.
+The transform is the deep sigmoidal flow \citep{huang2018naf}
+\begin{equation}
+u(z) \;=\; \mathrm{clip}\Bigl(\textstyle\sum_{k=1}^{K_f} w_k\,
+\varsigma\bigl(a_k z + b_k\bigr),\;\eta,\;1-\eta\Bigr),
+\qquad
+T_\phi(z) \;=\; \log u(z) - \log\bigl(1 - u(z)\bigr),
+\label{eq:dsf}
+\end{equation}
+with $\varsigma$ the logistic sigmoid and $\eta = 10^{-6}$ the numerical guard that
+keeps the logit finite. Samples become
+\begin{equation}
+\bvec^{(n)} = \mu + \sigma \odot T_\phi\bigl(z^{(n)}\bigr) + \Fmat\,\varepsilon^{(n)} .
+\label{eq:flow-sample}
+\end{equation}
+The flow parameters are dimensionless and pass through denormalisation unchanged.
+
+\paragraph{The flow is conditional.} $\phi = (w, a, b)$ is a function of
+$z_{i,\tau}$, the decoder output, hence of the history, the covariates and the
+hierarchy position. It is conditional in the sense that its parameters are amortised
+by the network; it is not a flow that takes a conditioning vector as an input
+argument.
+
+\paragraph{Monotonicity and invertibility.} Differentiating
+Equation~\eqref{eq:dsf},
+\begin{equation}
+T'_\phi(z) = \frac{1}{u(1-u)}\sum_{k=1}^{K_f} w_k\, a_k\,
+\varsigma\bigl(a_k z + b_k\bigr)\bigl(1 - \varsigma(a_k z + b_k)\bigr) > 0 ,
+\end{equation}
+since $w_k > 0$ and $a_k \ge a_{\min} > 0$. So $T_\phi$ is strictly increasing and
+invertible, though the inverse is never computed.
+
+\paragraph{The Gaussian is nested, and is the initialisation.} If all units share a
+slope and shift, $a_k \equiv a$ and $b_k \equiv b$, then
+$\sum_k w_k \varsigma(az+b) = \varsigma(az+b)$ and therefore
+\begin{equation}
+T_\phi(z) = a z + b ,
+\label{eq:nesting}
+\end{equation}
+exactly. The Gaussian marginal is thus a point of the flow's parameter space, not a
+limit of it. In particular, at the implementation's initialisation
+($\tilde{w} = \tilde{a} = \tilde{b} = 0$, $a_{\min} = 0.1$) we have
+$a = \mathrm{softplus}(0) + 0.1 = 0.7931$ and $b = 0$, so
+$T_\phi(z) = 0.7931\,z$: the flow head \emph{begins training as the Gaussian
+baseline with a rescaled $\sigma$}. We verified both statements numerically to
+within $10^{-6}$ over $z \in [-3,3]$. This matters for the fairness of the
+comparison --- the flow head does not start from a handicapped initialisation and
+spend training recovering the baseline.
+
+\paragraph{An identifiability caveat.} $\Exp[T_\phi(z)] \ne 0$ and
+$\mathrm{Var}[T_\phi(z)] \ne 1$ in general (for a randomly drawn $\phi$ we measured
+$\Exp[T_\phi(z)] = -0.110$ and $\mathrm{sd} = 0.531$). Once the flow is non-affine,
+$\mu$ is therefore no longer the predictive mean and $\sigma$ no longer its standard
+deviation: the flow absorbs part of the location and scale. Nothing in the objective
+is harmed, since CRPS sees only samples, but the parameters lose their
+interpretation and the parameterisation is redundant.
+
+\subsection{A second placement: warping the whole correlated draw}
+
+Equation~\eqref{eq:flow-sample} warps the idiosyncratic component and leaves the
+factor term Gaussian. The alternative is to build the correlated Gaussian first,
+standardise it, and warp \emph{it}:
+\begin{equation}
+g = z + \Fmat \varepsilon,
+\qquad
+\varrho_i = \sqrt{1 + \|\Fmat_i\|^2},
+\qquad
+\bvec = \mu + \sigma \odot R_\psi\!\left(\frac{g}{\varrho}\right),
+\label{eq:copula-sample}
+\end{equation}
+where $R_\psi$ is the monotonic rational-quadratic spline of \citet{durkan2019nsf},
+with softmax-normalised bin widths and heights inside $[-\text{tb}, \text{tb}]$
+($\text{tb}=4$), positive interior knot derivatives, boundary derivatives pinned to
+one, and identity tails outside the bound. Because a strictly increasing elementwise
+map leaves every rank statistic unchanged, Equation~\eqref{eq:copula-sample} alters
+each marginal while preserving the \emph{rank} correlation induced by
+Equation~\eqref{eq:cov-structure} exactly. This is a Gaussian copula in the sense of
+\citet{sklar1959}, and is the same construction as
+\citet{salinas2019copula} with a learned parametric marginal in place of an empirical
+one. A third head composes the spline with a DSF layer; a composition of strictly
+increasing maps is strictly increasing, so the guarantee survives.
+
+We treat Equation~\eqref{eq:flow-sample} as the primary proposal, because it is the
+minimal change to the marginal, and Equation~\eqref{eq:copula-sample} as the
+principled alternative whose comparison isolates the effect of \emph{placement}.
+
+\subsection{Why the first placement partially undoes itself}
+\label{sec:convolution}
+
+In Equation~\eqref{eq:flow-sample}, $\sigma_i T_\phi(z_i)$ and
+$(\Fmat\varepsilon)_i \sim \mathcal{N}(0, \|\Fmat_i\|^2)$ are independent. The
+marginal density of series $i$ is therefore a convolution,
+\begin{equation}
+p(\bvec_i) = \int
+\varphi\bigl(v;\,0,\,\|\Fmat_i\|^2\bigr)\;
+p_{\sigma_i T_\phi(z)}\bigl(\bvec_i - \mu_i - v\bigr)\,\mathrm{d}v ,
+\label{eq:convolution}
+\end{equation}
+with $\varphi$ the Gaussian density. Gaussian smoothing shrinks every standardised
+cumulant of order $\ge 3$. Define the Gaussian variance share
+\begin{equation}
+\rho_i \;=\;
+\frac{\|\Fmat_i\|^2}{\sigma_i^2\,\mathrm{Var}[T_\phi(z)] + \|\Fmat_i\|^2}
+\;\in\; [0,1] .
+\label{eq:rho}
+\end{equation}
+As $\rho_i \to 1$ the marginal tends to a Gaussian \emph{no matter what the flow
+learns}; the flow's expressive power is spent on a component whose contribution to
+the marginal is vanishing. Equation~\eqref{eq:copula-sample} has no such term, which
+is the structural reason to expect the two placements to behave differently. We
+regard this as the most plausible mechanism behind the result in
+Section~\ref{sec:nongauss}, but note that $\rho_i$ is a property of a \emph{trained}
+model and we did not measure it --- see Section~\ref{sec:missing}.
+
+\section{Experimental setup}
+
+\subsection{Datasets}
+Table~\ref{tab:datasets} lists the seven single-hierarchy datasets used. Two further
+configurations exist in the repository (a Favorita and an M5 panel) but were never
+run for this study and are excluded. Level slices are explicit row ranges verified
+against each file, and every aggregation was checked to satisfy
+$\Smat \bvec = \yvec$ at load time. Labour is truncated at 2019-12-31 to exclude the
+COVID-19 collapse.
+
+\begin{table}[t]
+\centering
+\caption{Datasets, as configured in this repository. $T$ is the usable row count,
+$\Na+\Nb$ the hierarchy size, $\Nb$ the bottom level, $h$ the horizon, $L$ the input
+window. ``train'' counts forecast-creation dates, ``val''/``test'' the windows scored.}
+\label{tab:datasets}
+\small
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+dataset & freq & $T$ & $\Na{+}\Nb$ & $\Nb$ & levels & $h$ & $L$ & train & val & test \\
+\midrule
+labour         & monthly   & 503 &  57 &  32 & 4 & 12 & 36 & 432 &   1 & 1 \\
+prison         & quarterly &  48 &  45 &  32 & 5 &  8 &  8 &  17 &   1 & 1 \\
+tourism-small  & quarterly &  36 &  89 &  56 & 4 &  4 &  8 &  17 &   1 & 1 \\
+wiki2          & daily     & 366 & 199 & 150 & 5 &  7 & 28 & 318 &   1 & 1 \\
+traffic        & daily     & 267 & 207 & 200 & 4 &  1 & 56 &  64 & 120 & 1 \\
+tourism-large  & monthly   & 228 & 555 & 304 & 8 & 12 & 36 & 157 &   1 & 1 \\
+police         & daily     & 334 & 676 & 500 & 6 & 30 & 56 & 189 &   1 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{A limitation of the protocol, stated up front.} In every configuration the
+test set is a \emph{single} forecast origin ($\text{test}=1$ in
+Table~\ref{tab:datasets}). Seed replication therefore varies the model, not the
+evaluation window, and all reported variability is training variability. Every
+number in this paper must be read in that light; see
+Sections~\ref{sec:validity} and~\ref{sec:missing}.
+
+\subsection{Baselines and configurations}
+All heads sit on an otherwise identical model. The comparison is generated by a
+single override, \texttt{model.head=\{factor\_model, normalizing\_flow,
+copula\_spline\}}, over the same configuration file, so dataset, split, features,
+architecture widths, optimiser (Adam, \citealp{kingma2015adam}), learning rate,
+schedule, batch size, early-stopping rule, Monte Carlo sample counts and scoring
+procedure are shared by construction. Seeds $0..11$ are used for every
+(dataset, head) cell, giving matched pairs.
+
+The repository also contains three further heads --- a skew-$t$ with an
+Azzalini-type representation \citep{azzalini2003skewt}, a parameter-tied skew-$t$,
+and a Gaussian mixture --- and a spline-then-flow composition. Results for these
+exist only as overall scores on five seeds and are reported separately rather than
+mixed into the main table.
+
+\subsection{Metrics and testing}
+We report Equation~\eqref{eq:scrps} per level and overall, with the quantile-integral
+CRPS estimator on a $1\%$ grid and $1000$ predictive samples. Because seeds are
+matched across heads, we test each candidate against the Gaussian baseline with a
+two-sided \emph{paired} Wilcoxon signed-rank test over the twelve seeds, and report
+the win count. The test asks whether the candidate beats the baseline for a typical
+seed on this single test window; it is not a test over datasets, over forecast
+origins, or over resamplings of the data.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Overall accuracy}
+Table~\ref{tab:overall} is the main result. The flow head lowers overall sCRPS on
+five of the six datasets for which it was run, with paired $p < 0.05$ on labour,
+prison and tourism-small, and $p = 0.052$ on tourism-large. It raises sCRPS on
+traffic by $5.9\%$, which is not significant. The copula-spline head improves four
+of seven, significantly on wiki2 and tourism-large.
+
+The two heads do not succeed in the same places. The flow's largest gains (prison
+$-7.3\%$, tourism-small $-6.6\%$) are datasets where the spline does nothing or
+hurts; the spline's clearest gain (wiki2 $-3.0\%$, $p=0.012$) is a dataset where
+the flow is flat ($-0.5\%$, $p=0.79$). Only tourism-large favours both. Since the
+two differ solely in \emph{where} the learned marginal is applied, this is direct
+evidence that placement, not flexibility, drives the outcome.
+
+\begin{table}[t]
+\centering
+\caption{Overall sCRPS, mean $\pm$ standard deviation over 12 matched seeds; lower is
+better. $\Delta$ is the mean paired difference relative to the Gaussian baseline
+(negative favours the candidate), ``wins'' the number of seeds on which the candidate
+wins, $p$ a two-sided paired Wilcoxon signed-rank test. Police has only 5 baseline
+seeds and no per-level flow run; its $\Delta$/wins/$p$ are computed on the 5 common
+seeds, and the 12-seed spline mean is shown for reference.}
+\label{tab:overall}
+\small
+\begin{tabular}{llrrrrr}
+\toprule
+dataset & head & mean sCRPS & $\Delta$ (\%) & wins & $p$ \\
+\midrule
+\labour
+ & Gaussian          & $0.008091 \pm 0.000325$ & --- & --- & --- \\
+ & flow              & $0.007946 \pm 0.000249$ & $-1.78$ & 9/12  & $0.034$ \\
+ & copula spline     & $0.008004 \pm 0.000300$ & $-1.07$ & 6/12  & $0.519$ \\
+\midrule
+\prison
+ & Gaussian          & $0.046746 \pm 0.002745$ & --- & --- & --- \\
+ & flow              & $0.043348 \pm 0.002008$ & $-7.27$ & 10/12 & $0.027$ \\
+ & copula spline     & $0.047597 \pm 0.004290$ & $+1.82$ & 6/12  & $0.910$ \\
+\midrule
+\tourism-small
+ & Gaussian          & $0.069716 \pm 0.002720$ & --- & --- & --- \\
+ & flow              & $0.065086 \pm 0.002951$ & $-6.64$ & 11/12 & $0.002$ \\
+ & copula spline     & $0.069194 \pm 0.002086$ & $-0.75$ & 6/12  & $0.733$ \\
+\midrule
+\wiki2
+ & Gaussian          & $0.246856 \pm 0.008888$ & --- & --- & --- \\
+ & flow              & $0.245650 \pm 0.005957$ & $-0.49$ & 5/12  & $0.791$ \\
+ & copula spline     & $0.239581 \pm 0.007049$ & $-2.95$ & 10/12 & $0.012$ \\
+\midrule
+\traffic
+ & Gaussian          & $0.020019 \pm 0.002250$ & --- & --- & --- \\
+ & flow              & $0.021204 \pm 0.001749$ & $+5.92$ & 4/12  & $0.233$ \\
+ & copula spline     & $0.020955 \pm 0.001886$ & $+4.68$ & 4/12  & $0.266$ \\
+\midrule
+\tourism-large
+ & Gaussian          & $0.128782 \pm 0.003064$ & --- & --- & --- \\
+ & flow              & $0.125960 \pm 0.003118$ & $-2.19$ & 10/12 & $0.052$ \\
+ & copula spline     & $0.124995 \pm 0.001328$ & $-2.94$ & 10/12 & $0.005$ \\
+\midrule
+\police
+ & Gaussian (5 seeds)& $0.347436 \pm 0.002791$ & --- & --- & --- \\
+ & flow              & \multicolumn{4}{l}{[EXPERIMENT REQUIRED]} \\
+ & copula spline     & $0.349248 \pm 0.004207$ & $+1.29$ & 1/5 & $0.125$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Accuracy by aggregation level}
+Table~\ref{tab:levels} breaks the flow's result down by level. Two patterns are
+consistent. First, the gain is not confined to the bottom level: on prison the
+largest improvements are at \emph{Total} ($-29.3\%$) and \emph{Gender} ($-28.3\%$),
+both aggregates, while the bottom level is $2.5\%$ \emph{worse}. Second, on the
+datasets where the flow loses, it loses at the top: traffic's Total worsens by
+$20.7\%$ and Halves by $21.9\%$ while its bottom level (Lanes) is unchanged
+($-0.5\%$).
+
+This is what Equation~\eqref{eq:coherent} predicts. Aggregates are sums of clipped
+bottom draws, so their distributions depend on the joint law, not only the marginals.
+A change to the marginal shape propagates upward and is amplified by summation over
+many series. It follows that a marginal-only intervention should not be evaluated at
+the bottom level alone --- and, less comfortably, that improvements at aggregate
+levels may reflect an incidentally better-calibrated sum rather than a better
+marginal. We did not measure which.
+
+\begin{table}[t]
+\centering
+\caption{Flow versus Gaussian by aggregation level, 12 matched seeds. $\Delta$ is the
+percentage change in level sCRPS (negative favours the flow). Police omitted: no
+per-level flow run exists.}
+\label{tab:levels}
+\small
+\begin{tabular}{llrrr}
+\toprule
+dataset & level & Gaussian & flow & $\Delta$ (\%) \\
+\midrule
+labour & Overall                  & $0.008091$ & $0.007946$ & $-1.78$ \\
+       & Total                    & $0.004413$ & $0.004138$ & $-6.24$ \\
+       & Geography                & $0.006175$ & $0.006042$ & $-2.15$ \\
+       & Gender/Geography         & $0.008212$ & $0.008107$ & $-1.28$ \\
+       & Status/Gender/Geography  & $0.013563$ & $0.013499$ & $-0.47$ \\
+\midrule
+prison & Overall                  & $0.046746$ & $0.043348$ & $-7.27$ \\
+       & Total                    & $0.028191$ & $0.019931$ & $-29.30$ \\
+       & State                    & $0.051348$ & $0.049776$ & $-3.06$ \\
+       & Gender                   & $0.028670$ & $0.020563$ & $-28.28$ \\
+       & Legal                    & $0.052372$ & $0.051527$ & $-1.61$ \\
+       & State/Gender/Legal       & $0.073149$ & $0.074945$ & $+2.46$ \\
+\midrule
+tourism-small & Overall           & $0.069716$ & $0.065086$ & $-6.64$ \\
+       & Country                  & $0.028601$ & $0.025970$ & $-9.20$ \\
+       & Country/Purpose          & $0.052920$ & $0.049840$ & $-5.82$ \\
+       & Country/Purpose/State    & $0.085783$ & $0.079747$ & $-7.04$ \\
+       & \dots/State/CityNonCity  & $0.111559$ & $0.104785$ & $-6.07$ \\
+\midrule
+wiki2  & Overall                  & $0.246856$ & $0.245650$ & $-0.49$ \\
+       & Total                    & $0.095012$ & $0.101134$ & $+6.44$ \\
+       & Language                 & $0.183715$ & $0.185752$ & $+1.11$ \\
+       & Language/Access          & $0.268280$ & $0.265681$ & $-0.97$ \\
+       & Language/Access/Agent    & $0.274603$ & $0.272017$ & $-0.94$ \\
+       & Article                  & $0.412672$ & $0.403668$ & $-2.18$ \\
+\midrule
+traffic & Overall                 & $0.020019$ & $0.021204$ & $+5.92$ \\
+       & Total                    & $0.006960$ & $0.008398$ & $+20.67$ \\
+       & Halves                   & $0.008712$ & $0.010619$ & $+21.89$ \\
+       & Quarters                 & $0.012350$ & $0.013991$ & $+13.29$ \\
+       & Lanes                    & $0.052054$ & $0.051808$ & $-0.47$ \\
+\midrule
+tourism-large & Overall           & $0.128782$ & $0.125960$ & $-2.19$ \\
+       & Country                  & $0.049931$ & $0.045936$ & $-8.00$ \\
+       & State                    & $0.072198$ & $0.070117$ & $-2.88$ \\
+       & Zone                     & $0.114373$ & $0.113057$ & $-1.15$ \\
+       & Region                   & $0.157094$ & $0.155975$ & $-0.71$ \\
+       & Country/Purpose          & $0.073664$ & $0.066667$ & $-9.50$ \\
+       & State/Purpose            & $0.115546$ & $0.112581$ & $-2.57$ \\
+       & Zone/Purpose             & $0.188330$ & $0.186362$ & $-1.04$ \\
+       & Region/Purpose           & $0.259124$ & $0.256986$ & $-0.83$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Is the data non-Gaussian, and does it matter?}
+\label{sec:nongauss}
+
+The motivation for the method is an empirical claim about the data, and the claim had
+never been tested. We test it with a deliberately model-free proxy. For each series
+we form seasonal-naive residuals $e_t = y_t - y_{t-m}$ at the period $m$ implied by
+the observation frequency, standardise by the residual standard deviation, and apply
+the D'Agostino--Pearson omnibus normality test \citep{dagostino1973}, controlling the
+false-discovery rate across series at $5\%$ \citep{benjamini1995fdr}.
+
+\paragraph{The proxy is a proxy.} Seasonal-naive residuals are not CLOVER's
+conditional residuals. They remove level and seasonality without fitting anything ---
+which is precisely why they cannot smuggle a distributional assumption into the
+diagnostic --- but any remaining trend or heteroskedasticity inflates the apparent
+departure from normality, and the power of the test scales with series length. Read
+Table~\ref{tab:nongauss} as evidence about the plausibility of a fixed Gaussian
+marginal, not as a measurement of the model's own residuals.
+
+\begin{table}[t]
+\centering
+\caption{Departure from normality of standardised seasonal-naive residuals,
+bottom-level series only. ``reject'' is the share of series for which normality is
+rejected at FDR $5\%$; $n$ is the median number of residuals available per series,
+and bounds the test's power. Last column repeats the flow's overall $\Delta$ from
+Table~\ref{tab:overall}.}
+\label{tab:nongauss}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+dataset & $n$ & median skew & share skew${>}0$ & median excess kurt. & reject & flow $\Delta$ (\%) \\
+\midrule
+tourism-small & 32  & $-0.055$ & $0.446$ & $0.507$  & $0.107$ & $-6.64$ \\
+prison        & 44  & $+0.258$ & $0.719$ & $-0.046$ & $0.312$ & $-7.27$ \\
+labour        & 491 & $-0.021$ & $0.438$ & $0.578$  & $0.469$ & $-1.78$ \\
+police        & 327 & $+0.000$ & $0.492$ & $2.423$  & $0.916$ & --- \\
+tourism-large & 216 & $-0.007$ & $0.493$ & $6.848$  & $0.957$ & $-2.19$ \\
+traffic       & 260 & $-0.187$ & $0.410$ & $8.528$  & $1.000$ & $+5.92$ \\
+wiki2         & 359 & $+0.200$ & $0.707$ & $49.874$ & $1.000$ & $-0.49$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three findings follow, and the second and third are negative.
+
+\paragraph{(i) The Gaussian marginal is a poor description of most of these series.}
+Normality is rejected for $95.7\%$ of tourism-large's and $100\%$ of traffic's and
+wiki2's bottom series. The dominant departure is \emph{tail weight}, not skew: median
+excess kurtosis reaches $49.9$ on wiki2 and $8.5$ on traffic while median skewness
+is within $\pm 0.26$ everywhere.
+
+\paragraph{(ii) The right-skew motivation is not supported for the tourism data.}
+A common motivating claim --- that tourism series are right-skewed --- does not
+survive this diagnostic. Median residual skewness is $-0.055$ on tourism-small and
+$-0.007$ on tourism-large, with essentially half the series on each side. The
+datasets with a detectable positive skew are prison (median $+0.258$, $71.9\%$
+positive) and wiki2 (median $+0.200$, $70.7\%$ positive). Any skew-based motivation
+in the paper must be attached to those two datasets, not to tourism.
+
+\paragraph{(iii) Measured non-Gaussianity predicts the flow's benefit with the wrong
+sign.} Across the six datasets with a flow run, the Spearman rank correlation between
+bottom-level median excess kurtosis and the flow's overall $\Delta$ is
+$\rho = +0.886$ ($p = 0.019$), and between rejection rate and $\Delta$ it is
+$\rho = +0.870$ ($p = 0.024$). Since $\Delta < 0$ means the flow wins, a positive
+correlation means the flow helps \emph{least} where the Gaussian assumption is most
+violated. The two datasets where it helps most, prison and tourism-small, have the
+\emph{weakest} measured departure from normality, and the dataset where it loses,
+traffic, has among the strongest. For the copula-spline head the correlation is weak
+and of the opposite sign ($\rho = -0.357$, $p = 0.432$, $n = 7$), i.e.\ in the
+hypothesised direction but not distinguishable from noise.
+
+\paragraph{Confounds we cannot separate.} With seven datasets this analysis is
+fragile, and three confounds run alongside the effect. (a) The rejection rate is
+partly a power artefact: tourism-small and prison have only 32 and 44 residuals per
+series, so their low rejection rates partly reflect a weak test, not a Gaussian
+truth. (b) Series length itself correlates with the flow's $\Delta$
+($\rho = +0.714$, $p = 0.111$), and the datasets with heavy tails are the long ones.
+(c) Hierarchy size correlates too ($\rho = +0.464$ for $\Nb$): the flow wins on the
+small hierarchies (prison $\Nb{=}32$, tourism-small $\Nb{=}56$) and loses on the
+large ones (traffic $\Nb{=}200$). A parameter-count explanation is therefore equally
+consistent with Table~\ref{tab:nongauss}: the flow fits $3K_f = 24$ extra shape
+parameters per $(\text{series}, \text{horizon})$, and the datasets where it fails are
+those with the most outputs to fit them for. Median excess kurtosis is the strongest
+single correlate, but $n=6$ cannot adjudicate between it and these alternatives.
+
+\subsection{Capacity ablation}
+Table~\ref{tab:capacity} varies $K_f$, the number of sigmoid units. The optimum is
+dataset-dependent and not monotone: tourism-small prefers $K_f = 4$ and is
+\emph{worse than the Gaussian baseline} at $K_f = 16$, while wiki2 and labour prefer
+$16$. This is the flexibility/data trade-off made visible, and it supports the
+parameter-count reading of Section~\ref{sec:nongauss}(iii). It also means the main
+result in Table~\ref{tab:overall}, run at the default $K_f = 8$, is not tuned per
+dataset and understates what a tuned flow could do --- and equally, that a tuned flow
+would need a held-out selection protocol the current splits do not provide.
+
+\begin{table}[t]
+\centering
+\caption{Flow capacity ablation: overall sCRPS, mean $\pm$ sd over 5 seeds. Bold is
+the best flow setting per row. The $K_f{=}8$ column is drawn from a different result
+file than $K_f \in \{4,16\}$ (see Section~\ref{sec:validity}), so read it as
+indicative. wiki2 at $K_f{=}24$ scores $0.252031$.}
+\label{tab:capacity}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+dataset & $K_f{=}4$ & $K_f{=}8$ (default) & $K_f{=}16$ & Gaussian \\
+\midrule
+labour        & $0.008074 \pm 0.000133$ & $0.007982 \pm 0.000266$ & $\mathbf{0.007900 \pm 0.000147}$ & $0.008136 \pm 0.000312$ \\
+prison        & $0.044436 \pm 0.001787$ & $0.043868 \pm 0.001816$ & $\mathbf{0.043539 \pm 0.001202}$ & $0.045451 \pm 0.002090$ \\
+tourism-small & $\mathbf{0.063501 \pm 0.003045}$ & $0.063942 \pm 0.003873$ & $0.069399 \pm 0.000720$ & $0.066318 \pm 0.003450$ \\
+wiki2         & $0.252971 \pm 0.007230$ & $0.252662 \pm 0.008020$ & $\mathbf{0.247347 \pm 0.006757}$ & $0.246369 \pm 0.010023$ \\
+traffic       & $0.019927 \pm 0.002007$ & $\mathbf{0.019307 \pm 0.001620}$ & $0.021469 \pm 0.001402$ & $0.021509 \pm 0.001869$ \\
+tourism-large & $0.126927 \pm 0.001787$ & $\mathbf{0.125795 \pm 0.002231}$ & $0.126041 \pm 0.001768$ & $0.128498 \pm 0.002315$ \\
+police        & $\mathbf{0.347071 \pm 0.001388}$ & $0.347883 \pm 0.003053$ & $0.347902 \pm 0.002360$ & $0.347029 \pm 0.003277$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cost}
+Table~\ref{tab:complexity} gives parameter counts and training cost. The flow adds
+$3 K_f$ outputs to a single linear layer, so the overhead is negligible in
+parameters --- $2040$ on labour's $9478$, and under $0.3\%$ on every dataset with
+more than $10^5$ parameters. Training cost rises more, up to $33\%$ on wiki2, since
+each draw evaluates $K_f$ sigmoids. Timings were collected under parallel workers and
+are indicative only.
+
+\begin{table}[t]
+\centering
+\caption{Parameter counts and total CPU-seconds over 12 seeds. Timings were recorded
+with four concurrent worker processes and three threads each, so they measure
+throughput under contention, not single-run latency.}
+\label{tab:complexity}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{parameters} & \multicolumn{3}{c}{CPU-seconds (12 seeds)} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+dataset & Gaussian & flow & spline & Gaussian & flow & spline \\
+\midrule
+labour        & $9{,}478$     & $11{,}518$    & $11{,}410$    & $116$  & $140$  & $153$ \\
+prison        & $81{,}766$    & $83{,}470$    & $83{,}376$    & $129$  & $145$  & $174$ \\
+tourism-small & $148{,}140$   & $149{,}844$   & $149{,}750$   & $171$  & $178$  & $174$ \\
+wiki2         & $706{,}524$   & $708{,}996$   & $708{,}870$   & $434$  & $576$  & $518$ \\
+traffic       & $820{,}525$   & $822{,}589$   & $822{,}480$   & $493$  & $493$  & $501$ \\
+tourism-large & $1{,}328{,}984$ & $1{,}331{,}096$ & $1{,}330{,}985$ & $2{,}636$ & $2{,}951$ & $3{,}593$ \\
+police        & $2{,}394{,}474$ & [EXPERIMENT REQUIRED] & $2{,}396{,}820$ & $1{,}652$ & --- & $6{,}732$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Other distribution families}
+For completeness, overall sCRPS on five seeds for the remaining heads in the
+repository: a parameter-tied flow (one global $(w,a,b)$ instead of per-output) is
+indistinguishable from the Gaussian baseline on all seven datasets, and a
+spline-then-flow composition improves tourism-large ($0.124168$ vs $0.128498$) but
+not consistently elsewhere. Skew-$t$ and Gaussian-mixture heads are implemented and
+tested but were not benchmarked at 12 seeds; their per-level results are
+[EXPERIMENT REQUIRED].
+
+\section{Discussion}
+
+The headline is mixed and dataset-dependent, and we think the interesting content is
+in \emph{why}.
+
+A learned marginal is not a free improvement. It buys shape at the cost of
+$3K_f$ parameters per series per horizon step, estimated from as few as 17 training
+windows (prison, tourism-small). That the two datasets with the fewest windows show
+the largest gains is, at first sight, paradoxical --- until one notes that they also
+have the smallest hierarchies and hence the fewest outputs to fit shape parameters
+for, and that with $h \cdot \Nb$ in the hundreds rather than the thousands the
+effective sample per shape parameter is not as small as the window count suggests.
+
+The placement result is the most portable finding. The flow warps the idiosyncratic
+component and lets an untouched Gaussian factor term smooth the marginal back toward
+normality (Equation~\eqref{eq:convolution}); the spline warps the whole correlated
+draw and preserves rank correlation exactly. These are not two implementations of one
+idea but two different models, and they win on disjoint datasets. Anyone adding a
+learned marginal to a factor-structured forecaster faces this choice, and our
+evidence is that it matters more than the choice of transform family.
+
+The negative finding about motivation deserves emphasis. We built the diagnostic to
+support the method's premise and it did the opposite: the measured departure from
+normality is, if anything, an indicator that the flow will \emph{not} help. Three
+readings are consistent with the data, and we cannot separate them at $n=6$. The
+first is the convolution mechanism: heavy-tailed datasets here are the
+high-dimensional ones, where cross-series structure and hence $\|\Fmat_i\|^2$ is
+large, so $\rho_i$ in Equation~\eqref{eq:rho} is large and the flow's contribution to
+the marginal is damped. The second is estimation: heavy-tailed data makes the shape
+parameters harder to estimate, and per-output flexibility hurts most where estimates
+are noisiest --- which the capacity ablation independently supports. The third is
+that the correlation is an artefact of series length acting on both variables. We
+regard the first two as the likely mechanisms and the required experiments to
+distinguish them as the natural next step.
+
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{No density, hence no likelihood.} The flow is used only forwards. This is
+a deliberate consequence of scoring-rule training and it keeps sampling cheap, but it
+means the model cannot report a predictive density, cannot be compared on
+log-likelihood, and cannot be used for tasks needing $p(\bvec)$.
+
+\paragraph{The marginal is not the flow's marginal.} By
+Equation~\eqref{eq:convolution} the realised bottom-level marginal is a Gaussian
+smoothing of the warped law. Describing the method as ``learning the marginal'' is
+therefore imprecise for the primary head; it learns the marginal of one additive
+component.
+
+\paragraph{Parameters lose their meaning.} Once $T_\phi$ is non-affine, $\mu$ is not
+a mean and $\sigma$ is not a standard deviation
+(Section~\ref{sec:method}), and the parameterisation is redundant.
+
+\paragraph{One test origin.} Every score comes from a single forecast creation date
+per dataset. This is the protocol inherited from the repository's evaluation, and it
+is the largest threat to every quantitative claim here.
+
+\paragraph{Nothing about calibration or coherence was measured.} The repository's
+calibration and PIT plotting path accepts only the Gaussian head and refuses the
+others, so no calibration comparison exists. Coherence is exact by construction for
+all heads and was never in question, but also never measured numerically. We
+therefore make no claim about calibration, sharpness, interval coverage, or
+coherence quality.
+
+\paragraph{Cross-series dependence was not evaluated.} All reported metrics are
+univariate CRPS aggregated over series. The repository implements an energy score but
+no experiment used it, so we make no claim that any head represents cross-series
+dependence better than another, even though the copula construction is designed to
+preserve it.
+
+\section{Threats to validity}
+\label{sec:validity}
+
+\paragraph{Single-origin test sets.} As above: $\text{test}=1$ everywhere.
+Seed variance is training variance, not forecast-origin variance, and the two should
+not be conflated.
+
+\paragraph{Runs are not bit-reproducible across invocations.} Comparing the 65
+(dataset, head, seed) cells that appear in two different benchmark invocations of the
+same code, \emph{none} are identical: $27$ differ by more than $1\%$ relative and $8$
+by more than $5\%$, the largest being traffic/Gaussian/seed~3 at $0.024311$ versus
+$0.016233$ ($33\%$). Nothing between the two commits changes the Gaussian code path,
+so this is run-to-run nondeterminism, not a version effect. The likely cause is
+nondeterministic floating-point reduction order under differing CPU thread counts
+(the benchmark sets \texttt{torch.set\_num\_threads} per worker), amplified by early
+stopping selecting a different step and by the single-window test set
+[NEEDS VERIFICATION]. \emph{Consequence:} the paired comparisons in
+Table~\ref{tab:overall} remain internally valid, because both heads were run in the
+same invocation under the same conditions, but no individual cell should be treated
+as exactly reproducible, and traffic's per-seed spread exceeds the flow-versus-
+Gaussian difference we report for it.
+
+\paragraph{One direction of the traffic result flips between experiment versions.}
+An earlier five-seed benchmark reports the flow \emph{beating} Gaussian on traffic by
+$10.2\%$; the twelve-seed benchmark reports it losing by $5.9\%$, and losing by
+$7.1\%$ on the first five seeds alone. We report the twelve-seed result and flag the
+conflict rather than choosing the convenient number. Given the nondeterminism above,
+the honest statement about traffic is that its result is not resolved.
+
+\paragraph{Provenance of some result files.} The main twelve-seed benchmark has a
+generating script in the repository. The five-seed sweep, the capacity sweep, the
+tail-metric file and the copula sweeps do not: no committed script produces their
+head labels (\texttt{n4}, \texttt{n16}) or their pinball metrics. Their numbers are
+consistent with the configuration they claim, but they cannot be regenerated from the
+repository as it stands. Tables~\ref{tab:capacity} and the previous subsection should
+be read with that caveat; Tables~\ref{tab:overall}--\ref{tab:complexity} are
+reproducible.
+
+\paragraph{Unequal seed counts.} Police has 5 Gaussian seeds against 12 spline seeds.
+Comparing those means directly gives $+0.52\%$; comparing on the 5 common seeds gives
+$+1.29\%$. We report the paired figure.
+
+\paragraph{No hyperparameter tuning per head.} Architecture widths, learning rate and
+schedule were tuned (by whatever process produced the configuration files) for the
+Gaussian head and reused unchanged. This is the fair-by-construction choice for
+isolating the head, but it may disadvantage the candidates.
+
+\paragraph{Multiplicity.} Table~\ref{tab:overall} performs 13 paired tests without a
+family-wise correction. Under a Holm correction at $5\%$ only tourism-small/flow
+($p=0.002$) and tourism-large/spline ($p=0.005$) would survive. We report uncorrected
+$p$-values and state this explicitly rather than implying stronger evidence than
+exists.
+
+\section{Experiments that should be run before publication}
+\label{sec:missing}
+
+\begin{enumerate}
+\item \textbf{Rolling-origin evaluation.} Score several test origins per dataset
+instead of one, and report variability over origins separately from variability over
+seeds. Without this, no claim in this paper is safely generalisable. \emph{This is
+the single most important missing experiment.}
+\item \textbf{Complete the police cell.} Twelve seeds of the flow head on police, and
+seeds 5--11 of the Gaussian baseline, so the largest hierarchy is in the main table.
+\item \textbf{Measure $\rho_i$ from Equation~\eqref{eq:rho}} on trained models. This
+directly tests the convolution explanation: if the flow fails where $\rho$ is large,
+the mechanism is confirmed; if not, it is not the mechanism.
+\item \textbf{Calibration and PIT for every head.} Extend the plotting path beyond
+the Gaussian head, and report interval coverage and PIT histograms per level, so a
+calibration claim becomes possible.
+\item \textbf{Energy score.} Evaluate the joint objective already implemented, to test
+whether the copula head's rank-correlation guarantee has a measurable benefit.
+\item \textbf{Held-out capacity selection.} Choose $K_f$ on validation rather than
+reporting a fixed default, and rerun the main table with the selected value.
+\item \textbf{A matched-capacity control.} Widen the Gaussian head's MLP by the
+flow's parameter count, so the comparison separates ``a learned marginal'' from
+``more parameters''.
+\item \textbf{Determinism.} Pin thread counts and enable deterministic kernels, then
+re-verify that a seed reproduces exactly; re-run traffic under that regime.
+\item \textbf{Regenerate the orphaned result files} from committed scripts, or drop
+them from the paper.
+\item \textbf{Skew-$t$ and mixture baselines at 12 seeds}, so the flow is compared
+against other non-Gaussian families and not only against the Gaussian.
+\end{enumerate}
+
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Hierarchical forecasting.} Reconciliation via optimal combination
+\citep{hyndman2011optimal} and trace minimisation \citep{wickramasuriya2019optimal}
+established the projection view. Probabilistic extensions reconcile distributions
+rather than points \citep{taieb2017coherent} and formalise what probabilistic
+coherence means and how to score it \citep{panagiotelis2023probabilistic}.
+End-to-end neural approaches impose coherence inside the model
+\citep{rangapuram2021endtoend}; CLOVER \citep{olivares2024clover} does so through a
+Gaussian factor reparameterisation and is the model we modify.
+
+\paragraph{Non-Gaussian and flow-based multivariate forecasting.} DeepAR
+\citep{salinas2020deepar} popularised per-series parametric likelihoods; the low-rank
+Gaussian copula process \citep{salinas2019copula} added learned marginals on top of a
+low-rank Gaussian dependence structure --- the closest antecedent to our
+copula-spline head, differing mainly in using an empirical rather than a learned
+parametric marginal transform. Conditioned normalizing flows
+\citep{rasul2021multivariate} model the multivariate predictive density directly.
+
+\paragraph{Flows for hierarchical series specifically.} This combination already
+exists in the literature. NeuralReconciler \citep{wang2024neuralreconciler} uses a
+normalizing flow with attention-based trainable reconciliation, explicitly motivated
+by non-Gaussian hierarchical distributions; a conditional-flow reconciliation layer on
+top of an autoregressive transformer appears in
+\citep{autoregressiveflowrecon2022}; and a flow-based reconciliation transformer
+appears in \citep{frt2025}. Accordingly we make \textbf{no novelty claim} of the form
+``first to apply normalizing flows to hierarchical forecasting''.
+
+\paragraph{Positioning.} What distinguishes this work is the setting and the
+question, not the ingredient. All three flow-based hierarchical systems above place
+the flow in or around a \emph{reconciliation} step. We instead place a learned
+marginal inside a model that is already coherent by construction, where no
+reconciliation step exists, and ask whether the marginal family --- holding the
+coherence mechanism, the dependence structure and the objective fixed --- is where
+the remaining accuracy is. Our contribution is best classified as an
+\textbf{integration and ablation contribution with a negative result about the
+motivating premise}, not as a new flow architecture.
+
+\section{Conclusion}
+
+Replacing a coherent hierarchical forecaster's fixed Gaussian marginal with a
+conditional deep sigmoidal flow lowered overall scaled CRPS on five of six datasets,
+significantly on three, at a negligible parameter cost and a modest training cost,
+while leaving hierarchical coherence exactly intact by construction. It raised sCRPS
+on one dataset. A second placement of the same idea, warping the whole correlated
+draw so that rank correlation is preserved, improved a different and largely disjoint
+set of datasets, which suggests that where a learned marginal is inserted matters
+more than which transform family is used.
+
+The motivating hypothesis did not survive contact with the data. Bottom-level
+residuals depart sharply from normality on most of these datasets --- through tail
+weight rather than skew --- but that departure is associated with the flow helping
+\emph{less}, not more. The implementation offers a candidate explanation, since the
+primary head's additive Gaussian factor term convolves the learned shape back toward
+normality at a rate set by its variance share, and the capacity ablation offers a
+second in the form of an estimation-variance cost that grows with the number of
+outputs. Distinguishing them, and repeating all of this over multiple forecast
+origins rather than one, is what the result needs before it can be called settled.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

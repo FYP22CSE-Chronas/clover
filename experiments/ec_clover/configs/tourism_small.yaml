@@ -1,0 +1,14 @@
+# Example EC-CLOVER config for the tourism_small dataset.
+# Usage: python -m experiments.ec_clover.cli --dataset tourism_small \
+#          --ec-config experiments/ec_clover/configs/tourism_small.yaml
+#
+# This is a config-only ablation knob, not a code change: rank, encoder choice and
+# beta initialization can all be swept from the command line or by copying this file.
+ec:
+  enabled: true
+  rank: 2
+  encoder: dilated_conv
+  encoder_channels: 8
+  alpha_init_std: 0.01
+  beta_init:
+    type: random
