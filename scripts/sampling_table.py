@@ -3,7 +3,8 @@ from collections import defaultdict
 from scipy.stats import wilcoxon
 R=os.path.dirname(os.path.dirname(os.path.abspath(__file__))); SP=R
 files=[os.path.join(R,'bench_ensemble.jsonl'),os.path.join(R,'bench_adaptive.jsonl'),
-       os.path.join(R,"bench_sampling2.jsonl"),os.path.join(R,"bench_snapshot.jsonl")]
+       os.path.join(R,"bench_sampling2.jsonl"),os.path.join(R,"bench_snapshot.jsonl"),
+       os.path.join(R,"bench_snapshot_val.jsonl")]
 recs=[json.loads(l) for f in files if os.path.exists(f) for l in open(f) if l.strip()]
 DS=['labour','prison','tourism_small','wiki2','traffic']
 v=defaultdict(dict); steps=defaultdict(list)
@@ -16,7 +17,7 @@ for f in ['bench_ensemble.json','bench_ensemble_dsf.json']:
     for d,s in json.load(open(os.path.join(R,f))).items():
         for h,e in s.get('ensemble',{}).items(): ens[(h,d)]=e['scrps']['Overall']
 NAME={'factor_model':'CLOVER (base)','normalizing_flow':'CLOVER + DSF','copula_spline':'CLOVER + Spline'}
-VAR={'':'','+as1':' + AS loss-prioritized (β=1)','+as0':' + AS loss-prioritized (β=0)','+sp':' + AS self-paced','+rec':' + AS recency','+snap':' + Snapshot ensemble (5 cycles)','+snap(best-snap)':' + cyclic LR, best single snapshot'}
+VAR={'':'','+as1':' + AS loss-prioritized (β=1)','+as0':' + AS loss-prioritized (β=0)','+sp':' + AS self-paced','+rec':' + AS recency','+snap':' + Snapshot ensemble (5 cycles)','+snapv':' + Snapshot ensemble, val-selected','+snap(best-snap)':' + cyclic LR, best single snapshot'}
 H=list(NAME)
 base_steps=np.mean(steps['factor_model'])
 basem={d:np.mean(list(v[('factor_model',d)].values())) for d in DS}
