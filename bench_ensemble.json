@@ -1,0 +1,532 @@
+{
+  "labour": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.008137261761915617,
+          "std": 0.0003222741102784683,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.007917782996209415,
+          "std": 0.00016568173117989093,
+          "n_seeds": 5
+        },
+        "delta_pct": -2.6972066541280073
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.004469022857743742,
+          "std": 0.00043762182644360855,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.004472474708942874,
+          "std": 0.00024026510765447862,
+          "n_seeds": 5
+        },
+        "delta_pct": 0.07723950646505613
+      },
+      "Geography": {
+        "factor_model": {
+          "mean": 0.006223251161923543,
+          "std": 0.0003210254132029525,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.005819540327229151,
+          "std": 0.00017809698089644784,
+          "n_seeds": 5
+        },
+        "delta_pct": -6.487137095871437
+      },
+      "Gender/Geography": {
+        "factor_model": {
+          "mean": 0.008232537252733874,
+          "std": 0.0002558167913647944,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.00779903507799225,
+          "std": 0.00018421564965952802,
+          "n_seeds": 5
+        },
+        "delta_pct": -5.265717742093004
+      },
+      "Status/Gender/Geography": {
+        "factor_model": {
+          "mean": 0.013624235756670136,
+          "std": 0.00035535182821586607,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.013580081852942887,
+          "std": 0.00031330361029135973,
+          "n_seeds": 5
+        },
+        "delta_pct": -0.32408352670814855
+      }
+    },
+    "n_params": {
+      "factor_model": 9478,
+      "copula_spline": 11410
+    },
+    "seconds": {
+      "factor_model": 48.13632011413574,
+      "copula_spline": 55.58617377281189
+    },
+    "wall_seconds": 36.05113911628723,
+    "ensemble": {
+      "factor_model": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.007930088846531206,
+          "Total": 0.004252399019307986,
+          "Geography": 0.00602263986435294,
+          "Gender/Geography": 0.008048526291158169,
+          "Status/Gender/Geography": 0.013396790192704282
+        }
+      },
+      "copula_spline": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.007743215601621886,
+          "Total": 0.0043699369471983576,
+          "Geography": 0.005693046258825407,
+          "Gender/Geography": 0.007643446959785831,
+          "Status/Gender/Geography": 0.01326643222334672
+        }
+      }
+    }
+  },
+  "prison": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.045432576933486866,
+          "std": 0.0020702965434302896,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.04637747815915579,
+          "std": 0.0014713248487010482,
+          "n_seeds": 5
+        },
+        "delta_pct": 2.0797878734729442
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.026156957323053204,
+          "std": 0.0019349189485653143,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.021358980901423297,
+          "std": 0.003939519184626274,
+          "n_seeds": 5
+        },
+        "delta_pct": -18.34302194392179
+      },
+      "State": {
+        "factor_model": {
+          "mean": 0.05058234007438754,
+          "std": 0.0030052856576901943,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.0547186270265619,
+          "std": 0.0029309566476202215,
+          "n_seeds": 5
+        },
+        "delta_pct": 8.177334117186826
+      },
+      "Gender": {
+        "factor_model": {
+          "mean": 0.026550360948373226,
+          "std": 0.0016216829611556598,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.021794302507565377,
+          "std": 0.0037114374052609135,
+          "n_seeds": 5
+        },
+        "delta_pct": -17.913347581435644
+      },
+      "Legal": {
+        "factor_model": {
+          "mean": 0.050794188415606824,
+          "std": 0.0012170850289695205,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.052825536892418215,
+          "std": 0.001078781134665232,
+          "n_seeds": 5
+        },
+        "delta_pct": 3.999174984725707
+      },
+      "State/Gender/Legal": {
+        "factor_model": {
+          "mean": 0.07307903790601358,
+          "std": 0.002965391071799308,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.08118994346781018,
+          "std": 0.002713804966938779,
+          "n_seeds": 5
+        },
+        "delta_pct": 11.098812729620187
+      }
+    },
+    "n_params": {
+      "factor_model": 81766,
+      "copula_spline": 83376
+    },
+    "seconds": {
+      "factor_model": 55.90648794174194,
+      "copula_spline": 56.99946594238281
+    },
+    "wall_seconds": 37.79807949066162,
+    "ensemble": {
+      "factor_model": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.0439395459070863,
+          "Total": 0.024662239563158522,
+          "State": 0.04913672319246063,
+          "Gender": 0.02508864976837412,
+          "Legal": 0.04947276960166724,
+          "State/Gender/Legal": 0.07133734740977095
+        }
+      },
+      "copula_spline": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.04516045188487663,
+          "Total": 0.02074636724854795,
+          "State": 0.05327686333444661,
+          "Gender": 0.021129452973402376,
+          "Legal": 0.052130083194757766,
+          "State/Gender/Legal": 0.07851949267322844
+        }
+      }
+    }
+  },
+  "tourism_small": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.06625135032268584,
+          "std": 0.0035785961297129794,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.06863792969679298,
+          "std": 0.0017720364066997367,
+          "n_seeds": 5
+        },
+        "delta_pct": 3.602310537797346
+      },
+      "Country": {
+        "factor_model": {
+          "mean": 0.02660922525949807,
+          "std": 0.004333824166710971,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.029787536988018004,
+          "std": 0.002222496107529843,
+          "n_seeds": 5
+        },
+        "delta_pct": 11.944397845200125
+      },
+      "Country/Purpose": {
+        "factor_model": {
+          "mean": 0.048071056481708764,
+          "std": 0.006151285657598447,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.05184291649336218,
+          "std": 0.002589301802823365,
+          "n_seeds": 5
+        },
+        "delta_pct": 7.846426285822582
+      },
+      "Country/Purpose/State": {
+        "factor_model": {
+          "mean": 0.0823060654036694,
+          "std": 0.002505375656001588,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.08377361511796935,
+          "std": 0.002568685975212106,
+          "n_seeds": 5
+        },
+        "delta_pct": 1.7830395695655794
+      },
+      "Country/Purpose/State/CityNonCity": {
+        "factor_model": {
+          "mean": 0.10801905414586706,
+          "std": 0.00324916074288668,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.1091476501878224,
+          "std": 0.0022404368276715426,
+          "n_seeds": 5
+        },
+        "delta_pct": 1.0448120018078486
+      }
+    },
+    "n_params": {
+      "factor_model": 148140,
+      "copula_spline": 149750
+    },
+    "seconds": {
+      "factor_model": 82.22144055366516,
+      "copula_spline": 63.76320743560791
+    },
+    "wall_seconds": 47.52436017990112,
+    "ensemble": {
+      "factor_model": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.06279587671128228,
+          "Country": 0.02549158140932478,
+          "Country/Purpose": 0.04604693039502943,
+          "Country/Purpose/State": 0.07795107879763467,
+          "Country/Purpose/State/CityNonCity": 0.10169391624314025
+        }
+      },
+      "copula_spline": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.0664093883698401,
+          "Country": 0.028037909628576847,
+          "Country/Purpose": 0.050198891449553217,
+          "Country/Purpose/State": 0.08149973067497014,
+          "Country/Purpose/State/CityNonCity": 0.10590102172626017
+        }
+      }
+    }
+  },
+  "wiki2": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.24802949536590874,
+          "std": 0.010677128555956253,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.2447643742922728,
+          "std": 0.006806250513785245,
+          "n_seeds": 5
+        },
+        "delta_pct": -1.3164245118585707
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.10949755480740313,
+          "std": 0.026817565809679977,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.10366788782312764,
+          "std": 0.012787986044884793,
+          "n_seeds": 5
+        },
+        "delta_pct": -5.324015677363189
+      },
+      "Language": {
+        "factor_model": {
+          "mean": 0.18818167030914848,
+          "std": 0.01395617635550403,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.18844265906155513,
+          "std": 0.006914218092392749,
+          "n_seeds": 5
+        },
+        "delta_pct": 0.13868978417393
+      },
+      "Language/Access": {
+        "factor_model": {
+          "mean": 0.2601042874150107,
+          "std": 0.007638123137099457,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.26418334401578836,
+          "std": 0.006874964449692932,
+          "n_seeds": 5
+        },
+        "delta_pct": 1.568238894220654
+      },
+      "Language/Access/Agent": {
+        "factor_model": {
+          "mean": 0.2665775266023324,
+          "std": 0.007307885551666537,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.2708015358203593,
+          "std": 0.006716136681095743,
+          "n_seeds": 5
+        },
+        "delta_pct": 1.584533126953375
+      },
+      "Article": {
+        "factor_model": {
+          "mean": 0.41578643769564894,
+          "std": 0.009323146472185956,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.39672644474053376,
+          "std": 0.015364523256084615,
+          "n_seeds": 5
+        },
+        "delta_pct": -4.584082410371183
+      }
+    },
+    "n_params": {
+      "factor_model": 706524,
+      "copula_spline": 708870
+    },
+    "seconds": {
+      "factor_model": 227.77076840400696,
+      "copula_spline": 322.3720369338989
+    },
+    "wall_seconds": 150.81818628311157,
+    "ensemble": {
+      "factor_model": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.2424126374533992,
+          "Total": 0.1043832063065621,
+          "Language": 0.18372412945942113,
+          "Language/Access": 0.2549736628526593,
+          "Language/Access/Agent": 0.26129158749172265,
+          "Article": 0.4076906011566307
+        }
+      },
+      "copula_spline": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.23780463864696055,
+          "Total": 0.1009454285940538,
+          "Language": 0.18342286398569752,
+          "Language/Access": 0.2566974756841823,
+          "Language/Access/Agent": 0.2630739071609043,
+          "Article": 0.3848835178099647
+        }
+      }
+    }
+  },
+  "traffic": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.020562298082391316,
+          "std": 0.002361005942945375,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.02159232429188217,
+          "std": 0.0012953060093286346,
+          "n_seeds": 5
+        },
+        "delta_pct": 5.009295193385636
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.008289916125687923,
+          "std": 0.00235259039265003,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.009267894220156985,
+          "std": 0.0010452088942881636,
+          "n_seeds": 5
+        },
+        "delta_pct": 11.79720131834152
+      },
+      "Halves": {
+        "factor_model": {
+          "mean": 0.009871089052383836,
+          "std": 0.002450124028436903,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.010907118353891862,
+          "std": 0.001132497799921071,
+          "n_seeds": 5
+        },
+        "delta_pct": 10.49559269509202
+      },
+      "Quarters": {
+        "factor_model": {
+          "mean": 0.013021594094399227,
+          "std": 0.002683143474645468,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.01348942391056571,
+          "std": 0.001472502042314327,
+          "n_seeds": 5
+        },
+        "delta_pct": 3.592723078103802
+      },
+      "Lanes": {
+        "factor_model": {
+          "mean": 0.051066592932368794,
+          "std": 0.002538894026705411,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.052704860563438746,
+          "std": 0.002618001206815619,
+          "n_seeds": 5
+        },
+        "delta_pct": 3.2081005154184243
+      }
+    },
+    "n_params": {
+      "factor_model": 820525,
+      "copula_spline": 822480
+    },
+    "seconds": {
+      "factor_model": 244.67561435699463,
+      "copula_spline": 209.56964993476868
+    },
+    "wall_seconds": 133.33471155166626,
+    "ensemble": {
+      "factor_model": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.01941367990060343,
+          "Total": 0.0073552809712493575,
+          "Halves": 0.008713287466232442,
+          "Quarters": 0.011862020453151094,
+          "Lanes": 0.04972413058895398
+        }
+      },
+      "copula_spline": {
+        "n_seeds": 5,
+        "scrps": {
+          "Overall": 0.020602086580314694,
+          "Total": 0.008545252601887128,
+          "Halves": 0.010174725218755927,
+          "Quarters": 0.012738126452064917,
+          "Lanes": 0.05095024193126177
+        }
+      }
+    }
+  }
+}
