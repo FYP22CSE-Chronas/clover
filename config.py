@@ -125,9 +125,11 @@ class TrainConfig:
     # rate follows cosine annealing with warm restarts over that many equal cycles
     # of `max_steps`, falling to `snapshot_lr_floor * learning_rate`. The weights at
     # the end of each cycle are kept and their forecasts pooled; early stopping is
-    # off, since the cycles fix the schedule.
+    # off, since the cycles fix the schedule. `snapshot_select="validation"` pools
+    # only the best-k snapshots by validation sCRPS, k chosen on validation too.
     snapshot_count: int = 0
     snapshot_lr_floor: float = 0.01
+    snapshot_select: str = "all"
 
     def __post_init__(self) -> None:
         if self.loss_weighting not in ("none", "per_series"):
@@ -158,6 +160,11 @@ class TrainConfig:
             raise ValueError("snapshot_count cannot exceed max_steps")
         if not 0.0 <= self.snapshot_lr_floor < 1.0:
             raise ValueError("snapshot_lr_floor must lie in [0, 1)")
+        if self.snapshot_select not in ("all", "validation"):
+            raise ValueError(
+                f"snapshot_select must be 'all' or 'validation', "
+                f"got {self.snapshot_select!r}"
+            )
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         if self.train_mc_samples < 2 or self.val_mc_samples < 2:

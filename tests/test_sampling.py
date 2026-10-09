@@ -122,3 +122,53 @@ def test_adaptive_draws_happen_one_step_at_a_time() -> None:
     batches = trainer._epoch(100)
     next(batches)
     assert CountingSampler.calls == 1
+
+
+class _StateModel:
+    """Stands in for CLOVER: remembers which snapshot was loaded last."""
+
+    state = None
+
+    def load_state_dict(self, state) -> None:
+        self.state = state
+
+
+def _selection_trainer(biases: list[float]) -> Trainer:
+    """A trainer whose snapshot `i` forecasts the target shifted by `biases[i]`."""
+    import torch
+
+    from training.losses import crps
+
+    trainer = Trainer.__new__(Trainer)
+    trainer.config = TrainConfig(max_steps=10, snapshot_count=len(biases),
+                                 snapshot_select="validation")
+    trainer.objective = crps
+    trainer.model = _StateModel()
+    trainer.snapshots = [{"bias": b} for b in biases]
+    target = torch.full((1, 2, 3), 10.0)
+    noise = torch.randn(1, 2, 3, 400, generator=torch.Generator().manual_seed(0))
+
+    def draws(val, num_samples):
+        bias = trainer.model.state["bias"]
+        return [(target, target.unsqueeze(-1) + bias + noise)]
+
+    trainer.validation_draws = draws
+    return trainer
+
+
+def test_validation_selection_drops_a_badly_biased_snapshot() -> None:
+    trainer = _selection_trainer([0.0, 0.1, 6.0])
+    kept = trainer.select_snapshots(val=None, num_samples=400)
+    assert 0 in kept and 2 not in kept
+
+
+def test_validation_selection_pools_opposite_biases() -> None:
+    """Two snapshots erring in opposite directions beat either one alone."""
+    trainer = _selection_trainer([-2.0, 2.0])
+    assert trainer.select_snapshots(val=None, num_samples=400) == [0, 1]
+
+
+def test_all_selection_keeps_every_snapshot() -> None:
+    trainer = _selection_trainer([0.0, 6.0])
+    trainer.config = TrainConfig(max_steps=10, snapshot_count=2)
+    assert trainer.select_snapshots(val=None, num_samples=400) == [0, 1]

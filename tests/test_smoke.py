@@ -187,3 +187,18 @@ def test_snapshot_ensemble_pools_every_cycle() -> None:
     assert result.samples.shape[-1] == 3 * config.eval.num_samples
     assert set(result.extras["single_scrps"]) == set(result.scrps)
     assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
+
+
+def test_validation_selected_snapshots_are_a_subset() -> None:
+    config = quick("tourism_small")
+    config = replace(
+        config,
+        train=replace(
+            config.train, max_steps=6, snapshot_count=3, snapshot_select="validation"
+        ),
+    )
+    result = run(config, seed=0, verbose=False)
+    kept = result.extras["snapshots_kept"]
+    assert kept and set(kept) <= set(result.history.snapshot_steps)
+    assert result.samples.shape[-1] == len(kept) * config.eval.num_samples
+    assert set(result.extras["all_scrps"]) == set(result.scrps)

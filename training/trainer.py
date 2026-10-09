@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import os
 import random
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -193,6 +193,58 @@ class Trainer:
             numerator += self.objective(target, samples, reduction="none").sum().item()
             denominator += target.abs().sum().item()
         return numerator / max(denominator, MASS_FLOOR)
+
+    @torch.no_grad()
+    def validation_draws(
+        self, val: Batcher, num_samples: int
+    ) -> list[tuple[Tensor, Tensor]]:
+        """(target, samples) for every validation window under the current weights."""
+        self.model.eval()
+        draws = []
+        for i in range(val.n_windows):
+            batch = val.batch([i])
+            params = denormalize_params(self.model(batch.windows), batch.scale)
+            samples = sample_coherent(params, self.model.S, num_samples).hierarchy
+            draws.append((aggregate_targets(self.model.S, batch.target_bottom), samples))
+        return draws
+
+    @torch.no_grad()
+    def pooled_validation_scrps(
+        self, members: Sequence[list[tuple[Tensor, Tensor]]]
+    ) -> float:
+        """Validation sCRPS of the equal-weight mixture of `validation_draws` sets."""
+        numerator = 0.0
+        denominator = 0.0
+        for window in zip(*members, strict=True):
+            target = window[0][0]
+            samples = torch.cat([s for _, s in window], dim=-1)
+            numerator += self.objective(target, samples, reduction="none").sum().item()
+            denominator += target.abs().sum().item()
+        return numerator / max(denominator, MASS_FLOOR)
+
+    def select_snapshots(self, val: Batcher, num_samples: int) -> list[int]:
+        """Indices of the snapshots to pool, per `config.snapshot_select`.
+
+        "validation" ranks snapshots by their own validation sCRPS and keeps the
+        best k, choosing k by the pooled validation sCRPS of each prefix. Every
+        candidate reuses the same draws, so the comparison is free of resampling
+        noise. Leaves the model holding the last snapshot's weights.
+        """
+        everything = list(range(len(self.snapshots)))
+        if self.config.snapshot_select == "all" or len(everything) < 2:
+            return everything
+        draws = []
+        for state in self.snapshots:
+            self.model.load_state_dict(state)
+            draws.append(self.validation_draws(val, num_samples))
+        own = [self.pooled_validation_scrps([d]) for d in draws]
+        ranked = sorted(everything, key=own.__getitem__)
+        scores = [
+            self.pooled_validation_scrps([draws[i] for i in ranked[:k]])
+            for k in range(1, len(ranked) + 1)
+        ]
+        best_k = 1 + int(np.argmin(scores))
+        return sorted(ranked[:best_k])
 
     def _train_step(
         self, batch: TrainingBatch, weights: np.ndarray | None = None

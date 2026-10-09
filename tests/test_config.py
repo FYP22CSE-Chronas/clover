@@ -112,6 +112,8 @@ def test_train_config_validation() -> None:
         TrainConfig(max_steps=3, snapshot_count=4)
     with pytest.raises(ValueError):
         TrainConfig(snapshot_lr_floor=1.0)
+    with pytest.raises(ValueError, match="snapshot_select"):
+        TrainConfig(snapshot_select="best")
 
 
 def test_eval_config_validation() -> None:

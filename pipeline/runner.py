@@ -77,9 +77,8 @@ def run(
         )
 
     trainer = Trainer(model, config.train, device=device, verbose=verbose)
-    history = trainer.fit(
-        batcher(split.train), batcher(split.val), checkpoint_dir=checkpoint_dir
-    )
+    val = batcher(split.val)
+    history = trainer.fit(batcher(split.train), val, checkpoint_dir=checkpoint_dir)
 
     test = batcher(split.test)
     samples = forecast(model, test, config.eval.num_samples)
@@ -97,16 +96,19 @@ def run(
 
     extras = {}
     if trainer.snapshots:
-        # The headline score pools every snapshot; the best-validation model's own
-        # score is kept alongside for comparison.
+        # The headline score pools the selected snapshots; the best-validation
+        # model's own score and the pool of every snapshot are kept for comparison.
         extras["single_scrps"] = score(samples)
         best = {k: v.clone() for k, v in model.state_dict().items()}
-        pooled = []
+        per_snapshot = []
         for state in trainer.snapshots:
             model.load_state_dict(state)
-            pooled.append(forecast(model, test, config.eval.num_samples))
+            per_snapshot.append(forecast(model, test, config.eval.num_samples))
+        keep = trainer.select_snapshots(val, config.train.val_mc_samples)
         model.load_state_dict(best)
-        samples = np.concatenate(pooled, axis=-1)
+        extras["all_scrps"] = score(np.concatenate(per_snapshot, axis=-1))
+        extras["snapshots_kept"] = [history.snapshot_steps[i] for i in keep]
+        samples = np.concatenate([per_snapshot[i] for i in keep], axis=-1)
     return RunResult(
         dataset=config.name,
         seed=seed,
