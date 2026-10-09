@@ -39,6 +39,7 @@ class PanelBatcher:
         self.scaler = scaler
         self.device = torch.device(device)
         self.n_windows = int(len(self.groups))
+        self.window_times = self.ts
 
         # Historical covariates are in their own units (store footfall in the
         # thousands), so they get one global z-score rather than the per-window target

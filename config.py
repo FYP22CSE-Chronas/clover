@@ -112,6 +112,22 @@ class TrainConfig:
     normalize_loss: bool = True
     checkpoint_every: int = 100
     restore_best: bool = True
+    # Training-window sampling: "uniform" shuffles each pass; "adaptive" draws
+    # windows by their latest loss raised to `sampler_power` (negative favours easy
+    # windows); "recency" favours recent windows, halving the weight every
+    # `recency_halflife` of the training span. See training.sampling.
+    window_sampler: str = "uniform"
+    sampler_mix: float = 0.5
+    sampler_beta: float = 1.0
+    sampler_power: float = 1.0
+    recency_halflife: float = 0.25
+    # Snapshot ensemble (Huang et al. 2017): with `snapshot_count > 0` the learning
+    # rate follows cosine annealing with warm restarts over that many equal cycles
+    # of `max_steps`, falling to `snapshot_lr_floor * learning_rate`. The weights at
+    # the end of each cycle are kept and their forecasts pooled; early stopping is
+    # off, since the cycles fix the schedule.
+    snapshot_count: int = 0
+    snapshot_lr_floor: float = 0.01
 
     def __post_init__(self) -> None:
         if self.loss_weighting not in ("none", "per_series"):
@@ -121,12 +137,36 @@ class TrainConfig:
             )
         if self.loss_weighting == "per_series" and self.objective != "crps":
             raise ValueError("loss_weighting='per_series' requires objective='crps'")
+        if self.window_sampler not in ("uniform", "adaptive", "recency"):
+            raise ValueError(
+                f"window_sampler must be 'uniform', 'adaptive' or 'recency', "
+                f"got {self.window_sampler!r}"
+            )
+        if self.sampler_power == 0:
+            raise ValueError("sampler_power must be non-zero (0 is uniform sampling)")
+        if self.recency_halflife <= 0:
+            raise ValueError("recency_halflife must be > 0")
+        if not 0.0 <= self.sampler_mix < 1.0:
+            raise ValueError("sampler_mix must lie in [0, 1)")
+        if not 0.0 <= self.sampler_beta <= 1.0:
+            raise ValueError("sampler_beta must lie in [0, 1]")
         if self.max_steps < 1:
             raise ValueError("max_steps must be >= 1")
+        if self.snapshot_count < 0:
+            raise ValueError("snapshot_count must be >= 0 (0 disables snapshots)")
+        if self.snapshot_count > self.max_steps:
+            raise ValueError("snapshot_count cannot exceed max_steps")
+        if not 0.0 <= self.snapshot_lr_floor < 1.0:
+            raise ValueError("snapshot_lr_floor must lie in [0, 1)")
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         if self.train_mc_samples < 2 or self.val_mc_samples < 2:
             raise ValueError("Monte Carlo sample counts must be >= 2")
+
+    @property
+    def snapshot_cycle(self) -> int:
+        """Steps per snapshot cycle, or 0 when snapshots are off."""
+        return self.max_steps // self.snapshot_count if self.snapshot_count else 0
 
     @property
     def lr_step_size(self) -> int:

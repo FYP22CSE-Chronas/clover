@@ -13,7 +13,7 @@ from pipeline.reporting import (
     write_results,
 )
 from pipeline.results import RunResult
-from pipeline.runner import build_model, forecast, prepare, run
+from pipeline.runner import build_model, ensemble_scrps, forecast, prepare, run
 
 __all__ = [
     "PanelBatcher",
@@ -22,6 +22,7 @@ __all__ = [
     "build_model",
     "build_panel_model",
     "combined_table",
+    "ensemble_scrps",
     "evaluate_panel",
     "forecast",
     "format_table",

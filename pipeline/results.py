@@ -20,6 +20,7 @@ class RunResult:
     samples: np.ndarray | None = None  # [Na+Nb, h, N], raw units
     y_true: np.ndarray | None = None  # [Na+Nb, h], raw units
     series_names: list[str] = field(default_factory=list)
+    level_slices: dict[str, tuple[int, int]] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
 
     def summary(self) -> dict[str, Any]:

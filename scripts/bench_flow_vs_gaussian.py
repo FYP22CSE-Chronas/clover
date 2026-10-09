@@ -31,28 +31,81 @@ DATASETS = [
 HEADS = ["factor_model", "normalizing_flow"]
 
 
-def _one(job: tuple[str, str, int, int]) -> dict:
-    """Train and score a single (dataset, head, seed) in a worker process."""
-    dataset, head, seed, threads = job
+def _one(job: tuple[str, str, int, int, bool, tuple[str, ...], str]) -> dict:
+    """Train and score a single (dataset, head, seed) in a worker process.
+
+    With `keep_samples`, the test forecast rides back under `_result` for pooling;
+    it is stripped before the record reaches the JSONL file. `overrides` apply on
+    top of the head, and `suffix` tags the record's head name so variants stay apart.
+    """
+    dataset, head, seed, threads, keep_samples, overrides, suffix = job
     import torch
 
     torch.set_num_threads(threads)
     from config import load_config
     from pipeline.runner import run
 
-    config = load_config(dataset, overrides=[f"model.head={head}"])
+    config = load_config(dataset, overrides=[f"model.head={head}", *overrides])
     start = time.time()
     result = run(config, seed=seed, device="cpu", verbose=False)
-    return {
+    record = {
         "dataset": dataset,
-        "head": head,
+        "head": head + suffix,
         "seed": seed,
         "scrps": result.scrps,
         "n_params": result.n_params,
         "steps_run": result.history.steps_run,
         "best_val_scrps": result.history.best_val,
         "seconds": time.time() - start,
+        **({"extras": result.extras} if result.extras else {}),
     }
+    if keep_samples:
+        record["_result"] = result
+    return record
+
+
+def ensemble_summary(
+    records: list[dict], heads: list[str], estimator: str, quantile_step: float
+) -> dict:
+    """Per-level sCRPS of each head's pooled multi-seed forecast."""
+    from pipeline.runner import ensemble_scrps
+
+    out = {}
+    for head in heads:
+        runs = [r["_result"] for r in records if r["head"] == head and "_result" in r]
+        if len(runs) >= 2:
+            out[head] = {
+                "n_seeds": len(runs),
+                "scrps": ensemble_scrps(runs, estimator, quantile_step),
+            }
+    return out
+
+
+def print_ensemble(summary: dict, heads: list[str], baseline: str) -> None:
+    """Pooled sCRPS per head, beside its change from that head's single-seed mean."""
+    pooled = summary.get("ensemble", {})
+    if not pooled:
+        return
+    shown = [h for h in heads if h in pooled]
+    print(f"\n{'ensemble (pooled seeds)':<34}" + "".join(f"{h[:21]:>22}" for h in shown))
+    for level, per_head in summary["levels"].items():
+        row = f"{level:<34}"
+        for head in shown:
+            value = pooled[head]["scrps"][level]
+            single = per_head[head]["mean"]
+            row += f"{value:.6f} ({100 * (value - single) / single:+.1f}%)".rjust(22)
+        print(row)
+    if baseline in pooled:
+        base = pooled[baseline]["scrps"]["Overall"]
+        for head in shown:
+            if head != baseline:
+                cand = pooled[head]["scrps"]["Overall"]
+                print(
+                    f"ensemble {head} vs ensemble {baseline} (Overall): "
+                    f"{100 * (cand - base) / base:+.2f}%"
+                )
+    print("(% in cells is pooled vs the same head's single-seed mean)")
+    sys.stdout.flush()
 
 
 def _stats(values: list[float]) -> tuple[float, float]:
@@ -132,6 +185,18 @@ def main(argv: list[str] | None = None) -> int:
         help="JSONL files of earlier runs; records for heads not in --heads are "
              "folded into the summary instead of being recomputed",
     )
+    parser.add_argument(
+        "--ensemble", action="store_true",
+        help="also score each head's equal-weight mixture over all of its seeds",
+    )
+    parser.add_argument(
+        "--set", dest="overrides", action="append", default=[], metavar="PATH=VALUE",
+        help="config override applied to every run, e.g. train.window_sampler=adaptive",
+    )
+    parser.add_argument(
+        "--suffix", default="",
+        help="appended to each run's head name, e.g. '+adaptive', to label variants",
+    )
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--threads", type=int, default=3)
     parser.add_argument("--jsonl", default="bench_flow_vs_gaussian.jsonl")
@@ -153,13 +218,15 @@ def main(argv: list[str] | None = None) -> int:
         with open(full, encoding="utf-8") as handle:
             merged.extend(json.loads(line) for line in handle if line.strip())
 
-    report_heads = list(args.heads)
+    run_heads = [head + args.suffix for head in args.heads]
+    report_heads = list(run_heads)
     if args.baseline not in report_heads:
         report_heads.insert(0, args.baseline)
 
     for dataset in args.datasets:
         jobs = [
-            (dataset, head, seed, args.threads)
+            (dataset, head, seed, args.threads, args.ensemble,
+             tuple(args.overrides), args.suffix)
             for head in args.heads
             for seed in range(args.seeds)
         ]
@@ -171,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
             r for r in merged
             if r["dataset"] == dataset
             and r["head"] in report_heads
-            and r["head"] not in args.heads
+            and r["head"] not in run_heads
             and r["seed"] < args.seeds
         ]
         if records:
@@ -181,8 +248,9 @@ def main(argv: list[str] | None = None) -> int:
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
             for record in pool.map(_one, jobs):
                 records.append(record)
+                line = {k: v for k, v in record.items() if k != "_result"}
                 with open(jsonl_path, "a", encoding="utf-8") as handle:
-                    handle.write(json.dumps(record) + "\n")
+                    handle.write(json.dumps(line) + "\n")
                 print(
                     f"    {record['head']:<18} seed {record['seed']:<3} "
                     f"overall={record['scrps']['Overall']:.6f} "
@@ -191,7 +259,15 @@ def main(argv: list[str] | None = None) -> int:
                 )
         summaries[dataset] = summarize(records, report_heads, args.baseline)
         summaries[dataset]["wall_seconds"] = time.time() - started
+        if args.ensemble:
+            from config import load_config
+
+            eval_config = load_config(dataset).eval
+            summaries[dataset]["ensemble"] = ensemble_summary(
+                records, report_heads, eval_config.estimator, eval_config.quantile_step
+            )
         print_summary(dataset, summaries[dataset], report_heads, args.baseline)
+        print_ensemble(summaries[dataset], report_heads, args.baseline)
         with open(out_path, "w", encoding="utf-8") as handle:
             json.dump(summaries, handle, indent=2)
 

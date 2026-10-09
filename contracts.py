@@ -151,6 +151,7 @@ class Batcher(Protocol):
     """Supplies training batches to the trainer; implemented by the pipeline layer."""
 
     n_windows: int
+    window_times: Sequence[int]  # forecast origin t of each window
 
     def batch(self, indices: Sequence[int]) -> TrainingBatch: ...
 

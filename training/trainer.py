@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import os
 import random
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -15,6 +16,7 @@ from model.distribution import aggregate_targets, sample_coherent
 from model.network import CLOVER
 from model.normalization import denormalize_params
 from training.losses import LOSSES
+from training.sampling import WindowSampler, build_sampler
 
 MASS_FLOOR = 1e-8
 
@@ -38,6 +40,7 @@ class History:
     best_val: float = float("inf")
     best_step: int = -1
     steps_run: int = 0
+    snapshot_steps: list[int] = field(default_factory=list)
 
 
 class Trainer:
@@ -60,23 +63,41 @@ class Trainer:
             lr=config.learning_rate,
             weight_decay=config.weight_decay,
         )
-        self.scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=config.lr_step_size, gamma=config.lr_decay_gamma
-        )
+        if config.snapshot_cycle:
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                self.optimizer,
+                T_0=config.snapshot_cycle,
+                eta_min=config.learning_rate * config.snapshot_lr_floor,
+            )
+        else:
+            self.scheduler = torch.optim.lr_scheduler.StepLR(
+                self.optimizer,
+                step_size=config.lr_step_size,
+                gamma=config.lr_decay_gamma,
+            )
         self.history = History()
+        self.snapshots: list[dict[str, Tensor]] = []
         self._best_state: dict[str, Tensor] | None = None
         self._patience = 0
+        self.sampler: WindowSampler | None = None
 
     def fit(
         self, train: Batcher, val: Batcher, checkpoint_dir: str | None = None
     ) -> History:
-        """Train to `max_steps` or early stopping, then restore the best weights."""
+        """Train to `max_steps` or early stopping, then restore the best weights.
+
+        With snapshots on, training runs whole cycles only and keeps the weights at
+        the end of each in `self.snapshots`.
+        """
         cfg = self.config
+        cycle = cfg.snapshot_cycle
+        limit = cycle * cfg.snapshot_count if cycle else cfg.max_steps
         path = (
             os.path.join(checkpoint_dir, "checkpoint_latest.pt")
             if checkpoint_dir
             else None
         )
+        self.sampler = build_sampler(cfg, train.window_times)
         step = 0
         if path is not None and os.path.exists(path):
             step = self._load(path)
@@ -84,23 +105,26 @@ class Trainer:
                 best = self.history.best_val
                 print(f"resumed at step {step} (best val sCRPS {best:.5f})")
 
-        stop = step >= cfg.max_steps
-        while step < cfg.max_steps and not stop:
-            order = np.random.permutation(train.n_windows)
-            for start in range(0, len(order), cfg.batch_size):
-                if step >= cfg.max_steps or stop:
+        stop = step >= limit
+        while step < limit and not stop:
+            for indices, weights in self._epoch(train.n_windows):
+                if step >= limit or stop:
                     break
-                batch = train.batch(order[start : start + cfg.batch_size].tolist())
-                loss = self._train_step(batch)
+                loss, priority = self._train_step(train.batch(indices), weights)
+                if self.sampler is not None:
+                    self.sampler.update(indices, priority)
                 step += 1
                 self.history.train_losses.append(loss)
                 self.history.steps_run = step
                 self.scheduler.step()
+                if cycle and step % cycle == 0:
+                    self.snapshots.append(self._state_copy())
+                    self.history.snapshot_steps.append(step)
 
-                if step % cfg.val_check_steps == 0 or step == cfg.max_steps:
+                if step % cfg.val_check_steps == 0 or step == limit:
                     stop = self._validate(val, step)
                 if path is not None and (
-                    step % cfg.checkpoint_every == 0 or stop or step >= cfg.max_steps
+                    step % cfg.checkpoint_every == 0 or stop or step >= limit
                 ):
                     self._save(path, step)
 
@@ -108,20 +132,52 @@ class Trainer:
             self.model.load_state_dict(self._best_state)
         return self.history
 
+    def _epoch(
+        self, n_windows: int
+    ) -> Iterator[tuple[list[int], np.ndarray | None]]:
+        """One pass of batches: a shuffled partition, or adaptive draws of equal count.
+
+        Adaptive draws are made lazily, one per step, so each sees the losses the
+        previous steps recorded rather than a snapshot from the start of the pass.
+        """
+        size = self.config.batch_size
+        if self.sampler is None:
+            order = np.random.permutation(n_windows)
+            for start in range(0, n_windows, size):
+                yield order[start : start + size].tolist(), None
+            return
+        for _ in range(math.ceil(n_windows / size)):
+            yield self.sampler.draw(size)
+
     def loss(self, batch: TrainingBatch, num_samples: int) -> Tensor:
         """Score one batch in raw units: denormalize, sample, clip, aggregate, score."""
+        return self.window_losses(batch, num_samples)[0].sum()
+
+    def window_losses(
+        self, batch: TrainingBatch, num_samples: int
+    ) -> tuple[Tensor, Tensor]:
+        """Each window's share of the batch loss, plus its own mass-scaled loss.
+
+        The shares sum to the batch loss. The second tensor is every window's loss
+        divided by its own target mass, a scale-free priority for adaptive sampling.
+        """
         params = denormalize_params(self.model(batch.windows), batch.scale)
         samples = sample_coherent(params, self.model.S, num_samples).hierarchy
         target = aggregate_targets(self.model.S, batch.target_bottom)
         per = self.objective(target, samples, reduction="none")
+        b = target.shape[0]
+        own_mass = target.abs().reshape(b, -1).sum(-1).detach().clamp_min(MASS_FLOOR)
 
         if self.config.loss_weighting == "per_series":
             mass = target.abs().sum(dim=(0, 1)).detach().clamp_min(MASS_FLOOR)
-            return (per / mass).sum()
-        total = per.sum()
-        if self.config.normalize_loss:
-            total = total / target.abs().sum().detach().clamp_min(MASS_FLOOR)
-        return total
+            shares = (per / mass).reshape(b, -1).sum(-1)
+        else:
+            raw = per.reshape(b, -1).sum(-1)
+            shares = raw
+            if self.config.normalize_loss:
+                shares = raw / target.abs().sum().detach().clamp_min(MASS_FLOOR)
+        priority = per.detach().reshape(b, -1).sum(-1) / own_mass
+        return shares, priority
 
     @torch.no_grad()
     def validation_scrps(self, val: Batcher, num_samples: int) -> float:
@@ -138,17 +194,28 @@ class Trainer:
             denominator += target.abs().sum().item()
         return numerator / max(denominator, MASS_FLOOR)
 
-    def _train_step(self, batch: TrainingBatch) -> float:
-        """One optimizer step; raises if the loss goes non-finite."""
+    def _train_step(
+        self, batch: TrainingBatch, weights: np.ndarray | None = None
+    ) -> tuple[float, np.ndarray]:
+        """One optimizer step; returns the loss and each window's priority.
+
+        `weights` are the adaptive sampler's importance weights, one per window.
+        Raises if the loss goes non-finite.
+        """
         self.model.train()
         self.optimizer.zero_grad()
-        loss = self.loss(batch, self.config.train_mc_samples)
+        shares, priority = self.window_losses(batch, self.config.train_mc_samples)
+        if weights is not None:
+            shares = shares * torch.as_tensor(
+                weights, dtype=shares.dtype, device=shares.device
+            )
+        loss = shares.sum()
         loss.backward()
         self.optimizer.step()
         value = loss.item()
         if not math.isfinite(value):
             raise RuntimeError(f"non-finite training loss: {value}")
-        return value
+        return value, priority.cpu().numpy()
 
     def _validate(self, val: Batcher, step: int) -> bool:
         """Record validation sCRPS and return True when patience is exhausted."""
@@ -164,15 +231,19 @@ class Trainer:
             self.history.best_val = score
             self.history.best_step = step
             self._patience = 0
-            self._best_state = {
-                k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()
-            }
+            self._best_state = self._state_copy()
             return False
         self._patience += 1
-        stop = 0 < self.config.early_stop_patience <= self._patience
+        # Snapshot cycles fix the schedule, so patience never ends them early.
+        patience = 0 if self.config.snapshot_cycle else self.config.early_stop_patience
+        stop = 0 < patience <= self._patience
         if stop and self.verbose:
             print(f"early stop at step {step} (best {self.history.best_val:.5f})")
         return stop
+
+    def _state_copy(self) -> dict[str, Tensor]:
+        """A detached CPU copy of the model weights."""
+        return {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}
 
     def _save(self, path: str, step: int) -> None:
         """Atomically write model, optimizer, schedule, history and RNG state."""
@@ -184,6 +255,8 @@ class Trainer:
             "history": self.history,
             "best_state": self._best_state,
             "patience": self._patience,
+            "snapshots": self.snapshots,
+            "sampler_scores": getattr(self.sampler, "scores", None),
             "torch_rng": torch.get_rng_state(),
             "numpy_rng": np.random.get_state(),
         }
@@ -200,6 +273,9 @@ class Trainer:
         self.history = state["history"]
         self._best_state = state["best_state"]
         self._patience = state["patience"]
+        self.snapshots = state.get("snapshots", [])
+        if hasattr(self.sampler, "scores") and state.get("sampler_scores") is not None:
+            self.sampler.scores = state["sampler_scores"]
         torch.set_rng_state(state["torch_rng"])
         np.random.set_state(state["numpy_rng"])
         return int(state["step"])

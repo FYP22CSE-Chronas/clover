@@ -57,6 +57,8 @@ def run_panel(
     Mirrors `runner.run` over a `PanelDataset`. The model and the trainer are the same
     objects the single-hierarchy path uses; only the data plumbing differs.
     """
+    if config.train.snapshot_count:
+        raise ValueError("snapshot ensembles are not supported on panel datasets")
     seed_everything(seed)
     dataset, split = prepare_panel(config)
     model = build_panel_model(config, dataset)

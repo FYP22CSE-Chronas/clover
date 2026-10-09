@@ -31,6 +31,7 @@ class WindowBatcher:
         self.scaler = scaler
         self.device = torch.device(device)
         self.n_windows = len(self.windows)
+        self.window_times = [w.t for w in self.windows]
         self._stat = _to_tensor(features.static, self.device)
 
     def batch(self, indices: Sequence[int]) -> TrainingBatch:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 
 import torch
@@ -9,7 +10,7 @@ from config import available_datasets, load_config
 from data import is_panel
 from pipeline.panel_runner import run_panel
 from pipeline.reporting import format_table, results_table, write_results
-from pipeline.runner import run
+from pipeline.runner import ensemble_scrps, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,6 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument(
+        "--ensemble",
+        action="store_true",
+        help="also score the equal-weight mixture of every seed's forecast "
+        "(needs two or more seeds; not available on panel datasets)",
+    )
+    parser.add_argument(
         "--threads",
         type=int,
         default=0,
@@ -43,7 +50,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Run every requested seed and write the aggregated results."""
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.ensemble and len(args.seeds) < 2:
+        parser.error("--ensemble needs at least two --seeds")
+    if args.ensemble and is_panel(args.dataset):
+        parser.error("--ensemble is not available on panel datasets")
     config = load_config(args.dataset, overrides=args.overrides)
     if args.threads > 0:
         torch.set_num_threads(args.threads)
@@ -70,6 +82,20 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{args.dataset}: sCRPS over {len(results)} seed(s)")
     print(format_table(results_table(results)))
     print(f"\nwrote {csv_path}")
+
+    if args.ensemble:
+        pooled = ensemble_scrps(
+            results,
+            estimator=config.eval.estimator,
+            quantile_step=config.eval.quantile_step,
+        )
+        path = os.path.join(args.out, f"{args.dataset}_ensemble.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"seeds": args.seeds, "scrps": pooled}, handle, indent=2)
+        print(f"\n{args.dataset}: sCRPS of the {len(results)}-seed ensemble")
+        for level, value in pooled.items():
+            print(f"{level:<34}{value:.4f}")
+        print(f"\nwrote {path}")
     return 0
 
 

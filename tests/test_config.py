@@ -106,6 +106,12 @@ def test_train_config_validation() -> None:
         TrainConfig(loss_weighting="per_series", objective="energy")
     with pytest.raises(ValueError, match="Monte Carlo"):
         TrainConfig(train_mc_samples=1)
+    with pytest.raises(ValueError):
+        TrainConfig(snapshot_count=-1)
+    with pytest.raises(ValueError):
+        TrainConfig(max_steps=3, snapshot_count=4)
+    with pytest.raises(ValueError):
+        TrainConfig(snapshot_lr_floor=1.0)
 
 
 def test_eval_config_validation() -> None:

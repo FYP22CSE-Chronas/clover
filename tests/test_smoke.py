@@ -9,7 +9,9 @@ import pytest
 
 from config import load_config
 from data import load, verify_coherence
-from pipeline.runner import prepare, run
+from pipeline.results import RunResult
+from pipeline.runner import ensemble_scrps, prepare, run
+from training.trainer import History
 
 QUICK = {
     "max_steps": 6,
@@ -134,3 +136,54 @@ def test_gmm_head_end_to_end_run_produces_finite_scores() -> None:
     assert set(result.scrps) >= {"Overall"}
     assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
     assert result.history.steps_run == QUICK["max_steps"]
+
+
+def test_ensemble_pools_seed_forecasts() -> None:
+    """Pooling seeds scores the mixture over the same levels as a single run."""
+    config = quick("tourism_small")
+    a = run(config, seed=0, verbose=False)
+    b = run(config, seed=1, verbose=False)
+    pooled = ensemble_scrps([a, b])
+    assert set(pooled) == set(a.scrps)
+    assert all(np.isfinite(v) and v >= 0 for v in pooled.values())
+    with pytest.raises(ValueError, match="at least two"):
+        ensemble_scrps([a])
+    with pytest.raises(ValueError, match="cannot be pooled"):
+        ensemble_scrps([a, replace(b, y_true=b.y_true + 1.0)])
+
+
+def test_ensemble_of_opposite_biases_beats_each_member() -> None:
+    """CRPS is convex in the forecast, so mixing two opposite biases must help."""
+    rng = np.random.default_rng(0)
+    y_true = np.full((3, 4), 10.0)
+    noise = rng.standard_normal((3, 4, 2000))
+
+    def member(seed: int, shift: float) -> RunResult:
+        return RunResult(
+            dataset="toy",
+            seed=seed,
+            scrps={},
+            history=History(),
+            samples=y_true[..., None] + shift + noise,
+            y_true=y_true,
+            level_slices={"Top": (0, 1), "Bottom": (1, 3)},
+        )
+
+    low, high = member(0, -2.0), member(1, 2.0)
+    pooled = ensemble_scrps([low, high])["Overall"]
+    single = ensemble_scrps([low, low])["Overall"]
+    assert pooled < 0.8 * single
+
+
+def test_snapshot_ensemble_pools_every_cycle() -> None:
+    """Each cycle ends in a kept snapshot, and the test forecast pools all of them."""
+    config = quick("tourism_small")
+    config = replace(
+        config, train=replace(config.train, max_steps=7, snapshot_count=3)
+    )
+    result = run(config, seed=0, verbose=False)
+    assert result.history.snapshot_steps == [2, 4, 6]
+    assert result.history.steps_run == 6
+    assert result.samples.shape[-1] == 3 * config.eval.num_samples
+    assert set(result.extras["single_scrps"]) == set(result.scrps)
+    assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())

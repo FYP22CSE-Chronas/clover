@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import torch
 
@@ -79,25 +81,72 @@ def run(
         batcher(split.train), batcher(split.val), checkpoint_dir=checkpoint_dir
     )
 
-    samples = forecast(model, batcher(split.test), config.eval.num_samples)
+    test = batcher(split.test)
+    samples = forecast(model, test, config.eval.num_samples)
     test_t = split.test[0].t
     y_true = dataset.values[test_t : test_t + config.data.h].T.astype(np.float64)
-    scores = scrps_by_level(
-        y_true,
-        samples,
-        dataset.level_slices,
-        estimator=config.eval.estimator,
-        quantile_step=config.eval.quantile_step,
-    )
+
+    def score(x: np.ndarray) -> dict[str, float]:
+        return scrps_by_level(
+            y_true,
+            x,
+            dataset.level_slices,
+            estimator=config.eval.estimator,
+            quantile_step=config.eval.quantile_step,
+        )
+
+    extras = {}
+    if trainer.snapshots:
+        # The headline score pools every snapshot; the best-validation model's own
+        # score is kept alongside for comparison.
+        extras["single_scrps"] = score(samples)
+        best = {k: v.clone() for k, v in model.state_dict().items()}
+        pooled = []
+        for state in trainer.snapshots:
+            model.load_state_dict(state)
+            pooled.append(forecast(model, test, config.eval.num_samples))
+        model.load_state_dict(best)
+        samples = np.concatenate(pooled, axis=-1)
     return RunResult(
         dataset=config.name,
         seed=seed,
-        scrps=scores,
+        scrps=score(samples),
         history=history,
         n_params=n_params,
         samples=samples,
         y_true=y_true,
         series_names=dataset.series_names,
+        level_slices=dataset.level_slices,
+        extras=extras,
+    )
+
+
+def ensemble_scrps(
+    results: Sequence[RunResult],
+    estimator: str = "quantile",
+    quantile_step: float = 0.01,
+) -> dict[str, float]:
+    """sCRPS per level of the equal-weight mixture of several seeds' forecasts.
+
+    Concatenating every seed's samples is an exact draw from the mixture. CRPS is
+    convex in the forecast distribution, so the mixture scores no worse than the
+    seeds' mean, up to estimator error.
+    """
+    if len(results) < 2:
+        raise ValueError("an ensemble needs at least two runs")
+    first = results[0]
+    if any(r.samples is None or r.y_true is None for r in results):
+        raise ValueError("every run must keep its test samples and targets")
+    for r in results[1:]:
+        if r.dataset != first.dataset or not np.array_equal(r.y_true, first.y_true):
+            raise ValueError("runs score different test targets and cannot be pooled")
+    pooled = np.concatenate([r.samples for r in results], axis=-1)
+    return scrps_by_level(
+        first.y_true,
+        pooled,
+        first.level_slices,
+        estimator=estimator,
+        quantile_step=quantile_step,
     )
 
 
