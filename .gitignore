@@ -16,3 +16,19 @@ data/favorita/panel/
 # M5's raw CSVs (~500MB) and built panel are bulk in the same way.
 data/raw/m5/*.csv
 data/raw/m5/panel/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment / secrets
+.env
+
+# Editor and OS cruft
+.vscode/
+.idea/
+.DS_Store
+
+# Logs from ad-hoc runs
+*.log
