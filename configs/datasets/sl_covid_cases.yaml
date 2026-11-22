@@ -1,0 +1,41 @@
+name: sl_covid_cases
+
+data:
+  dir: data/raw/sl_covid_cases
+  h: 7
+  input_size: 56
+  split: {strategy: last_h}
+  # Daily COVID cases: national total, nine provinces, then districts.
+  levels:
+    Total: [0, 1]
+    Province: [1, 10]
+    District: [10, 35]
+
+features:
+  static:
+    # Bottom names are list literals like "['Colombo', 'Western Province']".
+    - {type: list_static_dummies, keys: [province], positions: [1]}
+  future:
+    - {type: dayofweek_dummies}
+    - {type: weekend_indicator}
+    - {type: seasonal_naive_anchor, lags: [7]}
+
+model:
+  temp_conv_channels: 20
+  dilations: [1, 2, 3, 6, 12]
+  cross_series_hidden: 200
+  static_encoder_dim: 5
+  future_encoder_dim: 10
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 20
+
+train:
+  learning_rate: 0.0015
+  weight_decay: 0.0001
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 500
+  window_sampler: recency
+  recency_halflife: 0.5

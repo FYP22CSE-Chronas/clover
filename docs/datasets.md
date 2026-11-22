@@ -1,7 +1,9 @@
 # Datasets
 
-Eight hierarchies. Seven are a single hierarchy over one calendar, stored as a pair of
-CSVs under `data/raw/<name>/`; Favorita is a panel and lives under `data/favorita/`.
+Each dataset below is a single hierarchy over one calendar, stored as a pair of CSVs
+under `data/raw/<name>/`. The two panels are separate: Favorita lives under
+`data/favorita/` (see [Favorita](#favorita)), and M5 under `data/raw/m5/panel` (see
+`configs/datasets/m5.yaml`).
 
 - `data.csv` — `[T, Na+Nb]`, dated index, one column per hierarchy series.
 - `agg_mat.csv` — `[Na+Nb, Nb]`, the aggregation matrix `S`, in `[A; I]` form.
@@ -22,6 +24,11 @@ confirms `S @ bottom` reproduces every aggregate column.
 | traffic² | 267 | 207 | 200 | 1 | 56 | block 120/120/27 | 4 |
 | prison | 48 | 45 | 32 | 8 | 8 | last_h | 5 |
 | police | 334 | 676 | 500 | 30 | 56 | last_h | 6 |
+| nyc_crashes | 1500 | 234 | 228 | 7 | 56 | last_h | 3 |
+| sl_covid_cases | 411 | 35 | 25 | 7 | 56 | last_h | 3 |
+| sl_dengue_cases | 991 | 41 | 25 | 4 | 52 | last_h | 4 |
+| sl_tourism | 101 | 223 | 200 | 12 | 24 | last_h | 4 |
+| world_mortality | 120 | 135 | 128 | 12 | 24 | last_h | 3 |
 | favorita³ | 1688 | 93 | 54 | 34 | 96 | block 1620/34/34 | 4 |
 
 ¹ after `end_date: 2019-12-31` truncation; the file itself has 514 rows. The trailing
@@ -77,6 +84,25 @@ instead; switching means regenerating `agg_mat.csv` and the config levels togeth
 **police** — Total (1) → Crime (19) | Beat (79) | Street (10) | ZIP (67) → bottom (500)
 = 676, constructed the same way as prison.
 
+**nyc_crashes** — Total (1) → Borough (5) | ZIP (228) → bottom (228) = 234. The bottom
+series are the ZIP codes themselves, so the ZIP block *is* the identity block; each name
+is a list literal like `['10000', 'Manhattan']`, hence `list_static_dummies`.
+
+**sl_covid_cases** — Total (1) → Province (9) | District (25) → bottom (25) = 35. Names
+are list literals like `['Colombo', 'Western Province']`.
+
+**sl_dengue_cases** — Total (1) → Zone (3) | Province (12) | District (25) → bottom
+(25) = 41. Names are list literals ordered leaf-first, e.g.
+`['Ratnapura', 'Sabaragamuwa', 'Wet Zone']`, so the static keys use positions `[2, 1]`
+to read zone then province.
+
+**sl_tourism** — Total (1) → Continent (6) | Region (16) | Country (200) → bottom (200)
+= 223. Names are list literals like `['Afghanistan', 'South Asia', 'Asia']`; the bottom
+block is the country list.
+
+**world_mortality** — Total (1) → Continent (6) | Country (128) → bottom (128) = 135.
+Names are list literals like `['Algeria', 'Africa']`.
+
 ## Features
 
 A dataset config lists the builders it wants. There is no dataset name anywhere in the
@@ -85,12 +111,13 @@ feature code.
 | builder | kind | used by |
 |---|---|---|
 | `quarter_dummies` | future, shared | tourism_small, prison |
-| `month_dummies` | future, shared | tourism_large |
-| `dayofweek_dummies` | future, shared | wiki2, police, traffic |
-| `weekend_indicator` | future, shared | traffic |
+| `month_dummies` | future, shared | tourism_large, sl_dengue_cases, sl_tourism, world_mortality |
+| `dayofweek_dummies` | future, shared | wiki2, police, traffic, nyc_crashes, sl_covid_cases |
+| `weekend_indicator` | future, shared | traffic, nyc_crashes, sl_covid_cases |
 | `saturday_proximity` | future, shared | traffic |
 | `seasonal_naive_anchor` | future, per-series | all but labour |
 | `grouped_static_dummies` | static | tourism_small, wiki2, prison, police |
+| `list_static_dummies` | static | nyc_crashes, sl_covid_cases, sl_dengue_cases, sl_tourism, world_mortality |
 | `identity_dummies` | static | traffic |
 | `tourism_large_static_dummies` | static | tourism_large |
 
@@ -103,6 +130,12 @@ separator-joined path:
 | wiki2 | `de_AAC_AAG_001` | `_` | `[0,1,2]` |
 | prison | `NSW-Male-Sentenced` | `-` | `[0,1,2]` |
 | police | `13A-10H30-AVE-77002` | `-` | `[0,1,2,3]` |
+
+`list_static_dummies(keys, positions)` covers the other common layout: a bottom name that
+is a Python list literal, e.g. `"['Colombo', 'Western Province']"`. It `ast.literal_eval`s
+the string and reads the same `positions`, so `{keys: [zone, province], positions: [2, 1]}`
+reads zone then province out of a leaf-first name. Output columns are named
+`f"{key}_{level}"`, matching `grouped_static_dummies`.
 
 Only **tourism_large** needs a dedicated builder, because its keys are a prefix and a
 suffix rather than fields between separators. Categories are always read off the data,
@@ -178,9 +211,10 @@ then back-filled along the date axis.
 1. Drop `data.csv` and `agg_mat.csv` into `data/raw/<name>/`, columns matching rows.
 2. Write `configs/datasets/<name>.yaml`: `dir`, `h`, `input_size`, split, level ranges,
    feature list, architecture widths, training schedule.
-3. Only if its bottom-series names are not a separator-joined path, add a module under
-   `data/features/` registering a static builder, and import it from that package's
-   `__init__.py` so the decorator runs.
+3. Only if its bottom-series names are neither a separator-joined path nor a Python list
+   literal, add a module under `data/features/` registering a static builder, and import
+   it from that package's `__init__.py` so the decorator runs. `grouped_static_dummies`
+   and `list_static_dummies` already cover the two common layouts.
 
 No change to `model/`, and no `if name == ...` anywhere. See
 [IMPLEMENTATION.md](../IMPLEMENTATION.md) for the full recipe.

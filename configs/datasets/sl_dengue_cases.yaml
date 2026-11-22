@@ -1,0 +1,40 @@
+name: sl_dengue_cases
+
+data:
+  dir: data/raw/sl_dengue_cases
+  h: 4
+  input_size: 52
+  split: {strategy: last_h}
+  # Weekly dengue cases: total, three climate zones, provinces, then districts.
+  levels:
+    Total: [0, 1]
+    Zone: [1, 4]
+    Province: [4, 16]
+    District: [16, 41]
+
+features:
+  static:
+    # Bottom names are list literals like "['Ratnapura', 'Sabaragamuwa', 'Wet Zone']".
+    - {type: list_static_dummies, keys: [zone, province], positions: [2, 1]}
+  future:
+    - {type: month_dummies}
+    # 4 = horizon, 52 = one year of weeks.
+    - {type: seasonal_naive_anchor, lags: [4, 52]}
+
+model:
+  temp_conv_channels: 30
+  dilations: [1, 2, 3, 6, 12]
+  cross_series_hidden: 50
+  static_encoder_dim: 10
+  future_encoder_dim: 10
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 20
+
+train:
+  learning_rate: 0.0019251
+  weight_decay: 0.0001
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 500

@@ -1,0 +1,41 @@
+name: nyc_crashes
+
+data:
+  dir: data/raw/nyc_crashes
+  h: 7
+  input_size: 56
+  split: {strategy: last_h}
+  # Daily crash counts: city total, five boroughs, then one series per ZIP.
+  levels:
+    Total: [0, 1]
+    Borough: [1, 6]
+    ZIP: [6, 234]
+
+features:
+  static:
+    # Bottom names are list literals like "['10000', 'Manhattan']".
+    - {type: list_static_dummies, keys: [borough], positions: [1]}
+  future:
+    - {type: dayofweek_dummies}
+    - {type: weekend_indicator}
+    # 7 keeps the weekly shape; 364 = 52 weeks gives a day-of-week-aligned
+    # year-ago reference for the four-year upward trend.
+    - {type: seasonal_naive_anchor, lags: [7, 364]}
+
+model:
+  temp_conv_channels: 30
+  dilations: [1, 2, 3, 6, 12]
+  cross_series_hidden: 50
+  static_encoder_dim: 10
+  future_encoder_dim: 10
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 20
+
+train:
+  learning_rate: 0.0019251
+  weight_decay: 0.0001
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 100
+  val_mc_samples: 500
