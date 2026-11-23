@@ -13,7 +13,7 @@ from data.windows import WindowSplit
 from model.distribution import sample_coherent
 from model.network import CLOVER
 from model.normalization import denormalize_params
-from pipeline.batching import WindowBatcher
+from pipeline.batching import WindowBatcher, hist_feature_stats
 from pipeline.results import RunResult
 from training.metrics import scrps_by_level
 from training.trainer import Trainer, seed_everything
@@ -22,14 +22,21 @@ from training.trainer import Trainer, seed_everything
 def prepare(
     config: RunConfig,
 ) -> tuple[HierarchicalDataset, ExogenousFeatures, WindowSplit]:
-    """Load the dataset, build its features and split it into windows."""
+    """Load the dataset, split it into windows, then build features on the split.
+
+    The split comes first so a fitted feature only ever sees the training span.
+    """
     check_anchor_lags(config.future_features, config.data.h)
     dataset = load(config.name, config.data)
-    features = build_features(
-        dataset, static=config.static_features, future=config.future_features
-    )
     split = build_split(
         dataset.bottom, config.data.input_size, config.data.h, config.data.split
+    )
+    features = build_features(
+        dataset,
+        static=config.static_features,
+        future=config.future_features,
+        history=config.history_features,
+        fit_end=split.train_end,
     )
     return dataset, features, split
 
@@ -43,8 +50,9 @@ def build_model(
         input_size=config.data.input_size,
         n_stat_features=features.n_static,
         n_futr_features=features.n_future,
+        n_hist_features=features.n_hist,
     )
-    return CLOVER(config.model, dims, dataset.S)
+    return CLOVER(config.model, dims, dataset.S, coint_beta=features.coint_beta)
 
 
 def run(
@@ -66,6 +74,8 @@ def run(
             f"train={len(split.train)} val={len(split.val)} params={n_params:,}"
         )
 
+    hist_stats = hist_feature_stats(features, split.train_end)
+
     def batcher(windows) -> WindowBatcher:
         return WindowBatcher(
             windows,
@@ -74,16 +84,21 @@ def run(
             h=config.data.h,
             scaler=config.train.scaler,
             device=device,
+            hist_stats=hist_stats,
         )
 
+    train = batcher(split.train)
+    if config.model.error_correction_init == "ols":
+        warm_start_error_correction(model, train)
     trainer = Trainer(model, config.train, device=device, verbose=verbose)
     val = batcher(split.val)
-    history = trainer.fit(batcher(split.train), val, checkpoint_dir=checkpoint_dir)
+    history = trainer.fit(train, val, checkpoint_dir=checkpoint_dir)
 
     test = batcher(split.test)
-    samples = forecast(model, test, config.eval.num_samples)
-    test_t = split.test[0].t
-    y_true = dataset.values[test_t : test_t + config.data.h].T.astype(np.float64)
+    samples = forecast_windows(model, test, config.eval.num_samples)
+    y_true = np.concatenate(
+        [dataset.values[w.t : w.t + config.data.h] for w in split.test]
+    ).T.astype(np.float64)
 
     def score(x: np.ndarray) -> dict[str, float]:
         return scrps_by_level(
@@ -103,7 +118,7 @@ def run(
         per_snapshot = []
         for state in trainer.snapshots:
             model.load_state_dict(state)
-            per_snapshot.append(forecast(model, test, config.eval.num_samples))
+            per_snapshot.append(forecast_windows(model, test, config.eval.num_samples))
         keep = trainer.select_snapshots(val, config.train.val_mc_samples)
         model.load_state_dict(best)
         extras["all_scrps"] = score(np.concatenate(per_snapshot, axis=-1))
@@ -153,10 +168,50 @@ def ensemble_scrps(
 
 
 @torch.no_grad()
-def forecast(model: CLOVER, batcher: WindowBatcher, num_samples: int) -> np.ndarray:
-    """Coherent predictive samples for the first window of `batcher`, [Na+Nb, h, N]."""
+def warm_start_error_correction(model: CLOVER, train: WindowBatcher) -> None:
+    """Set the error-correction table to its least-squares estimate on the training
+    windows: per (horizon, series), regress the normalized h-step change on the final
+    value of each history channel. This is the linear VECM forecast adjustment the
+    skip is meant to represent; training then refines it jointly with the network.
+    """
+    if model.error_correction is None:
+        raise ValueError("the model has no error-correction skip to warm-start")
+    batch = train.batch(list(range(train.n_windows)))
+    windows = batch.windows
+    if windows.hist_exog is None or windows.scale is None:
+        raise ValueError("warm start needs history channels and the window scale")
+    x = windows.hist_exog[:, :, -1, :]  # [W, X, Nb]
+    target = (batch.target_bottom - windows.scale.loc) / windows.scale.scale
+    change = target - windows.insample_y[:, -1:, :]  # [W, H, Nb]
+    n_windows, n_channels, n_bottom = x.shape
+    design = torch.cat([x, torch.ones(n_windows, 1, n_bottom, device=x.device)], 1)
+    table = torch.zeros_like(model.error_correction)  # [H, Nb, X]
+    for n in range(n_bottom):
+        coef = torch.linalg.lstsq(design[:, :, n], change[:, :, n]).solution  # [X+1, H]
+        table[:, n, :] = coef[:n_channels].T
+    model.error_correction.copy_(table)
+
+
+@torch.no_grad()
+def forecast(
+    model: CLOVER, batcher: WindowBatcher, num_samples: int, index: int = 0
+) -> np.ndarray:
+    """Coherent predictive samples for one window of `batcher`, [Na+Nb, h, N]."""
     model.eval()
-    batch = batcher.batch([0])
+    batch = batcher.batch([index])
     params = denormalize_params(model(batch.windows), batch.scale)
     hierarchy = sample_coherent(params, model.S, num_samples).hierarchy
     return hierarchy.squeeze(0).permute(1, 0, 2).cpu().numpy()
+
+
+def forecast_windows(
+    model: CLOVER, batcher: WindowBatcher, num_samples: int
+) -> np.ndarray:
+    """Samples for every window of `batcher`, concatenated in time: [Na+Nb, k*h, N].
+
+    sCRPS is a ratio of sums, so scoring the concatenation pools the origins exactly.
+    """
+    return np.concatenate(
+        [forecast(model, batcher, num_samples, i) for i in range(batcher.n_windows)],
+        axis=1,
+    )

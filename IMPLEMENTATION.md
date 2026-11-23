@@ -155,8 +155,9 @@ N    Monte Carlo samples
 |---|---|
 | `WindowBatch.insample_y` | `[B, L, Nb]`, normalized |
 | `WindowBatch.futr_exog` | `[B, F, L+H, Nb]`, shared channels first |
-| `WindowBatch.hist_exog` | `[B, X, L, Nb]` |
+| `WindowBatch.hist_exog` | `[B, X, L, Nb]`, z-scored with training-row statistics |
 | `WindowBatch.stat_exog` | `[Nb, S]`, or `[B, Nb, S]` for a panel |
+| `WindowBatch.scale` | the `ScaleStats` that normalized the window, for raw-unit constraints |
 | `FactorParams.mu` / `.sigma` | `[B, H, Nb]` |
 | `FactorParams.F` | `[B, H, Nb, K]` |
 | `ForecastSamples.bottom` | `[B, H, Nb, N]` |
@@ -183,6 +184,10 @@ per-series-last, because the batcher re-normalizes only the trailing per-series 
   chunked evaluation exact.
 - **Anchors need `lag >= h`.** A shorter lag feeds the model true future observations.
   `check_anchor_lags` refuses it; do not bypass it.
+- **A fitted feature fits on the training rows only.** A builder that estimates
+  anything from the series (`equilibrium_error`'s Johansen vectors) declares a
+  `fit_end` keyword; `build_feature` injects `WindowSplit.train_end`, so the split is
+  built before the features. Config cannot set `fit_end`.
 
 ## 8. Code style
 

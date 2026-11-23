@@ -61,9 +61,60 @@ class ModelConfig:
     # head keeps its own class default.
     n_flow_components: int = 8
     flow_a_floor: float = 0.1
+    # Adds `A_h @ x_T` to `mu` at every horizon, where `x_T` is the final step of each
+    # history channel and `A` is a zero-initialized [H, Nb, X] table: the forecast
+    # function of a VECM when the history channels are equilibrium errors. Requires at
+    # least one `features.history` entry.
+    error_correction_skip: bool = False
+    # "full" learns one adjustment per (horizon, series, channel); "separable" factors
+    # it as a per-series speed times a per-horizon response shared across series,
+    # the shape a VECM's multi-step correction actually has, with far fewer
+    # parameters to overfit.
+    error_correction_form: str = "full"
+    # "zero" starts the table at zero; "ols" starts it at the least-squares fit of the
+    # normalized h-step change on the history channels over the training windows
+    # (see pipeline.runner.warm_start_error_correction). Adam at these learning rates
+    # cannot move a zero table far enough within one run, so a VECM-sized adjustment
+    # is only reachable from a data-driven start.
+    error_correction_init: str = "zero"
+    # Whether history channels also enter the temporal encoder. False routes them
+    # only through the error-correction skip, isolating that term's contribution.
+    hist_to_encoder: bool = True
+    # The first `trend_factors` of the K factor loadings are projected onto the
+    # orthogonal complement of the cointegrating vectors (in raw units, per window)
+    # and scaled by `trend_growth` over the horizon: the common-trends representation
+    # of a cointegrated system, where variance grows along the trends and stays
+    # bounded along the equilibrium relations. Requires a `features.history` block
+    # that supplies the vectors (equilibrium_error).
+    trend_factors: int = 0
+    trend_growth: str = "sqrt"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "dilations", tuple(self.dilations))
+        if not 0 <= self.trend_factors <= self.n_factors:
+            raise ValueError(
+                f"trend_factors must lie in [0, n_factors={self.n_factors}], "
+                f"got {self.trend_factors}"
+            )
+        if self.error_correction_init not in ("zero", "ols"):
+            raise ValueError(
+                f"error_correction_init must be 'zero' or 'ols', "
+                f"got {self.error_correction_init!r}"
+            )
+        if self.error_correction_init == "ols" and self.error_correction_form != "full":
+            raise ValueError(
+                "error_correction_init='ols' requires error_correction_form='full'"
+            )
+        if self.error_correction_form not in ("full", "separable"):
+            raise ValueError(
+                f"error_correction_form must be 'full' or 'separable', "
+                f"got {self.error_correction_form!r}"
+            )
+        if self.trend_growth not in ("sqrt", "linear", "none"):
+            raise ValueError(
+                f"trend_growth must be 'sqrt', 'linear' or 'none', "
+                f"got {self.trend_growth!r}"
+            )
         if self.sigma_activation not in ("softplus", "exp"):
             raise ValueError(
                 f"sigma_activation must be 'softplus' or 'exp', "
@@ -130,6 +181,11 @@ class TrainConfig:
     snapshot_count: int = 0
     snapshot_lr_floor: float = 0.01
     snapshot_select: str = "all"
+    # Learning-rate multiplier for the model's error-correction table. A zero-
+    # initialized table must reach VECM-sized entries (about one window standard
+    # deviation per unit of equilibrium error at long horizons), which Adam at the
+    # shared learning rate cannot do within one run.
+    error_correction_lr_mult: float = 1.0
 
     def __post_init__(self) -> None:
         if self.loss_weighting not in ("none", "per_series"):
@@ -165,6 +221,8 @@ class TrainConfig:
                 f"snapshot_select must be 'all' or 'validation', "
                 f"got {self.snapshot_select!r}"
             )
+        if self.error_correction_lr_mult <= 0:
+            raise ValueError("error_correction_lr_mult must be > 0")
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         if self.train_mc_samples < 2 or self.val_mc_samples < 2:
@@ -216,12 +274,17 @@ class SplitConfig:
     train: int | None = None
     val: int | None = None
     test: int | None = None
+    # `rolling` only: how many non-overlapping h-step test origins end the series,
+    # with as many validation origins before them.
+    origins: int | None = None
 
     def __post_init__(self) -> None:
-        if self.strategy not in ("last_h", "block"):
+        if self.strategy not in ("last_h", "block", "rolling"):
             raise ValueError(f"unknown split strategy {self.strategy!r}")
         if self.strategy == "block" and None in (self.train, self.val, self.test):
             raise ValueError("block split requires train, val and test row counts")
+        if self.strategy == "rolling" and (self.origins is None or self.origins < 1):
+            raise ValueError("rolling split requires origins >= 1")
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> SplitConfig:
@@ -237,6 +300,7 @@ class DataConfig:
     input_size: int
     split: SplitConfig = field(default_factory=SplitConfig)
     end_date: str | None = None
+    start_date: str | None = None
     levels: dict[str, tuple[int, int]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -282,12 +346,23 @@ class RunConfig:
     eval: EvalConfig
     static_features: tuple[FeatureSpec, ...] = ()
     future_features: tuple[FeatureSpec, ...] = ()
+    history_features: tuple[FeatureSpec, ...] = ()
 
     def validate(self) -> None:
         if self.data.input_size < self.model.receptive_field:
             raise ValueError(
                 f"{self.name}: input_size {self.data.input_size} is shorter than the "
                 f"encoder receptive field {self.model.receptive_field}"
+            )
+        if self.model.error_correction_skip and not self.history_features:
+            raise ValueError(
+                f"{self.name}: model.error_correction_skip needs at least one "
+                "features.history entry to read the equilibrium error from"
+            )
+        if self.model.trend_factors > 0 and not self.history_features:
+            raise ValueError(
+                f"{self.name}: model.trend_factors needs a features.history entry "
+                "that supplies cointegrating vectors (equilibrium_error)"
             )
 
 
@@ -315,7 +390,7 @@ def load_config(
         raise ValueError(f"{dataset}: unknown top-level config key(s) {unknown}")
 
     features = merged.get("features") or {}
-    unknown_sections = sorted(set(features) - {"static", "future"})
+    unknown_sections = sorted(set(features) - {"static", "future", "history"})
     if unknown_sections:
         raise ValueError(f"{dataset}: unknown features section(s) {unknown_sections}")
 
@@ -331,6 +406,9 @@ def load_config(
         ),
         future_features=tuple(
             FeatureSpec.from_dict(f) for f in features.get("future") or []
+        ),
+        history_features=tuple(
+            FeatureSpec.from_dict(f) for f in features.get("history") or []
         ),
     )
     config.validate()

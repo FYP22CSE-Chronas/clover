@@ -38,8 +38,11 @@ class ExogenousFeatures:
     static: np.ndarray | None = None  # [Nb, S]
     future_shared: np.ndarray | None = None  # [T, C1]
     future_series: np.ndarray | None = None  # [T, Nb, C2], raw units
+    hist_series: np.ndarray | None = None  # [T, Nb, X], own units
+    coint_beta: np.ndarray | None = None  # [Nb, R] cointegrating vectors, raw units
     static_names: list[str] = field(default_factory=list)
     future_names: list[str] = field(default_factory=list)
+    hist_names: list[str] = field(default_factory=list)
 
     @property
     def n_static(self) -> int:
@@ -58,3 +61,8 @@ class ExogenousFeatures:
     @property
     def n_future(self) -> int:
         return self.n_future_shared + self.n_future_series
+
+    @property
+    def n_hist(self) -> int:
+        """Per-series history-only channels; z-scored with training-row statistics."""
+        return 0 if self.hist_series is None else self.hist_series.shape[2]

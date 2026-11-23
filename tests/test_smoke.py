@@ -7,7 +7,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from config import load_config
+from config import FeatureSpec, load_config
 from data import load, verify_coherence
 from pipeline.results import RunResult
 from pipeline.runner import ensemble_scrps, prepare, run
@@ -67,6 +67,25 @@ def test_forecast_samples_are_coherent() -> None:
     np.testing.assert_allclose(
         np.einsum("ij,jhn->ihn", dataset.S, bottom), result.samples, rtol=1e-4, atol=1e-3
     )
+
+
+def test_equilibrium_error_feature_and_skip_run_end_to_end() -> None:
+    """Sibling-level cointegration errors feed the encoder and the mean skip."""
+    config = quick("tourism_small")
+    config = replace(
+        config,
+        model=replace(config.model, error_correction_skip=True),
+        history_features=(
+            FeatureSpec(
+                "equilibrium_error", {"rank": 1, "level": "Country/Purpose/State"}
+            ),
+        ),
+    )
+    dataset, features, split = prepare(config)
+    assert features.n_hist == 1
+    assert features.hist_series.shape == (dataset.n_steps, dataset.n_bottom, 1)
+    result = run(config, seed=0, verbose=False)
+    assert all(np.isfinite(v) and v >= 0 for v in result.scrps.values())
 
 
 def test_runs_are_reproducible_under_a_seed() -> None:

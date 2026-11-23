@@ -43,6 +43,25 @@ class History:
     snapshot_steps: list[int] = field(default_factory=list)
 
 
+def _param_groups(model: CLOVER, config: TrainConfig) -> list[dict]:
+    """The shared group first (its lr is what gets logged), then the error-correction
+    table at `error_correction_lr_mult` times the base rate when one exists."""
+    fast = [
+        p
+        for name, p in model.named_parameters()
+        if name in ("error_correction", "error_speed")
+    ]
+    fast_ids = {id(p) for p in fast}
+    groups = [{"params": [p for p in model.parameters() if id(p) not in fast_ids]}]
+    if fast and config.error_correction_lr_mult != 1.0:
+        groups.append(
+            {"params": fast, "lr": config.learning_rate * config.error_correction_lr_mult}
+        )
+    elif fast:
+        groups[0]["params"].extend(fast)
+    return groups
+
+
 class Trainer:
     """Fits a `CLOVER` model against `Batcher`s of raw-unit windows."""
 
@@ -59,7 +78,7 @@ class Trainer:
         self.verbose = verbose
         self.objective = LOSSES.get(config.objective)
         self.optimizer = torch.optim.Adam(
-            model.parameters(),
+            _param_groups(model, config),
             lr=config.learning_rate,
             weight_decay=config.weight_decay,
         )
@@ -132,9 +151,7 @@ class Trainer:
             self.model.load_state_dict(self._best_state)
         return self.history
 
-    def _epoch(
-        self, n_windows: int
-    ) -> Iterator[tuple[list[int], np.ndarray | None]]:
+    def _epoch(self, n_windows: int) -> Iterator[tuple[list[int], np.ndarray | None]]:
         """One pass of batches: a shuffled partition, or adaptive draws of equal count.
 
         Adaptive draws are made lazily, one per step, so each sees the losses the

@@ -99,6 +99,35 @@ Adding a dataset is one config file, plus one small feature module only if its
 bottom-series names need custom parsing — six of the seven single hierarchies need
 none. See [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
+## Cointegration
+
+Hierarchy series that share a long-run equilibrium can be told so. A `features.history`
+block estimates cointegrating vectors on the training rows and feeds the equilibrium
+errors `beta^T y_t` to the encoder as a history channel; `model.error_correction_skip`
+adds a zero-initialized, per-horizon affine map from the last equilibrium error to `mu`,
+the forecast function of a vector error-correction model:
+
+```bash
+python -m cli --dataset labour --seeds 0 1 2 \
+  --set model.error_correction_skip=true \
+  --set "features.history=[{type: equilibrium_error, rank: 1, level: Gender/Geography}]"
+```
+
+`level` tests siblings under each node of that level jointly (here employed vs.
+unemployed within every gender and region); omitting it tests all bottom series in one
+Johansen problem, which needs `ridge` once there are more series than training rows.
+The fit never sees validation or test rows.
+
+`model.trend_factors: k` reserves the first `k` of the `K` factor loadings for common
+stochastic trends: they are projected onto the orthogonal complement of the estimated
+cointegrating vectors (in raw units, per window) and grow with the horizon, so
+predictive variance accumulates along the trends and stays bounded along the
+equilibrium relations. `data.split: {strategy: rolling, origins: k}` scores the last
+`k` non-overlapping horizons instead of one, which is needed to tell a small gain from
+seed noise. `scripts/bench_cointegration.py` runs baseline against these variants and
+reports a validation-gated choice; `scripts/build_synthetic_coint.py` generates a
+hierarchy that is cointegrated by construction.
+
 ## Swap components
 
 Encoder, cross-series mixer, decoder and distribution head each sit behind a small

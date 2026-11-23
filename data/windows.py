@@ -25,6 +25,11 @@ class WindowSplit:
     val: list[Window]
     test: list[Window]
 
+    @property
+    def train_end(self) -> int:
+        """First row no training target reaches; features may be fitted on [0, it)."""
+        return max(w.t + len(w.target) for w in self.train)
+
     def target_indices(self) -> dict[str, set[int]]:
         """Target row indices touched by each split, for leakage checks."""
         return {
@@ -77,6 +82,36 @@ def last_h_split(
     test = [w for w in windows if w.t == n_steps - h]
     if not train or not val or not test:
         raise ValueError("last_h split produced an empty block; series is too short")
+    return WindowSplit(train=train, val=val, test=test)
+
+
+@register_split("rolling")
+def rolling_split(
+    values: np.ndarray, input_size: int, h: int, config: SplitConfig
+) -> WindowSplit:
+    """`origins` non-overlapping test origins at the end, as many validation origins
+    before them, training before that. `origins=1` is exactly `last_h`.
+
+    One test window per dataset cannot separate a small real gain from seed noise;
+    scoring several consecutive origins (without re-fitting) is the cheapest way to
+    get that power while keeping every test target out of training and validation.
+    """
+    k = config.origins
+    assert k is not None
+    n_steps = values.shape[0]
+    windows = rolling_windows(values, input_size, h)
+    test_start = n_steps - k * h
+    val_start = test_start - k * h
+    test = [w for w in windows if w.t >= test_start and (w.t - test_start) % h == 0]
+    val = [
+        w for w in windows if val_start <= w.t < test_start and (w.t - val_start) % h == 0
+    ]
+    train = [w for w in windows if w.t + h <= val_start]
+    if len(test) != k or len(val) != k or not train:
+        raise ValueError(
+            f"rolling split with {k} origins of h={h} needs more than "
+            f"{input_size + 2 * k * h + h} rows, got {n_steps}"
+        )
     return WindowSplit(train=train, val=val, test=test)
 
 

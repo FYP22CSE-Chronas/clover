@@ -20,6 +20,8 @@ def load_csv_hierarchy(config: DataConfig) -> HierarchicalDataset:
             "that ordering is what makes S valid"
         )
     data.index = pd.to_datetime(data.index)
+    if config.start_date is not None:
+        data = data.loc[config.start_date :]
     if config.end_date is not None:
         data = data.loc[: config.end_date]
 

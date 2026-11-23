@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import replace
 
 import numpy as np
 import torch
@@ -15,6 +16,8 @@ from model.encoders import ENCODERS
 from model.heads import HEADS
 from model.mixers import MIXERS
 
+EPS = 1e-6
+
 
 class CLOVER(nn.Module):
     """Coherent probabilistic forecaster: a Gaussian factor model over a hierarchy.
@@ -24,7 +27,11 @@ class CLOVER(nn.Module):
     """
 
     def __init__(
-        self, config: ModelConfig, dims: ModelDims, S: Tensor | np.ndarray
+        self,
+        config: ModelConfig,
+        dims: ModelDims,
+        S: Tensor | np.ndarray,
+        coint_beta: Tensor | np.ndarray | None = None,
     ) -> None:
         super().__init__()
         S_t = torch.as_tensor(S, dtype=torch.float32)
@@ -38,7 +45,7 @@ class CLOVER(nn.Module):
 
         self.encoder = ENCODERS.create(
             config.encoder,
-            in_channels=1 + dims.n_hist_features,
+            in_channels=1 + (dims.n_hist_features if config.hist_to_encoder else 0),
             input_size=dims.input_size,
             channels=config.temp_conv_channels,
             dilations=config.dilations,
@@ -91,6 +98,53 @@ class CLOVER(nn.Module):
             **{k: v for k, v in candidate_kwargs.items() if k in accepted}
         )
 
+        # Zero-initialized so the skip starts as an exact no-op and the adjustment
+        # speeds are learned from the CRPS gradient alone.
+        self.error_correction: nn.Parameter | None = None
+        if config.error_correction_skip:
+            if dims.n_hist_features == 0:
+                raise ValueError(
+                    "error_correction_skip needs n_hist_features >= 1; configure a "
+                    "features.history block such as equilibrium_error"
+                )
+            if config.error_correction_form == "separable":
+                self.error_speed: nn.Parameter | None = nn.Parameter(
+                    torch.zeros(self.n_bottom, dims.n_hist_features)
+                )
+                # The response starts at one so the speed alone controls the size.
+                self.error_correction = nn.Parameter(
+                    torch.ones(dims.h, dims.n_hist_features)
+                )
+            else:
+                self.error_speed = None
+                self.error_correction = nn.Parameter(
+                    torch.zeros(dims.h, self.n_bottom, dims.n_hist_features)
+                )
+
+        self.trend_factors = config.trend_factors
+        if config.trend_factors > 0:
+            if coint_beta is None:
+                raise ValueError(
+                    "trend_factors > 0 needs cointegrating vectors; configure an "
+                    "equilibrium_error history feature"
+                )
+            beta_t = torch.as_tensor(coint_beta, dtype=torch.float32)
+            if beta_t.dim() != 2 or beta_t.shape[0] != self.n_bottom:
+                raise ValueError(
+                    f"coint_beta must be [Nb={self.n_bottom}, R]; got "
+                    f"{tuple(beta_t.shape)}"
+                )
+            growth = torch.arange(1, dims.h + 1, dtype=torch.float32)
+            if config.trend_growth == "sqrt":
+                growth = growth.sqrt()
+            elif config.trend_growth == "none":
+                growth = torch.ones(dims.h)
+            self.register_buffer("coint_beta", beta_t)
+            self.register_buffer("trend_growth", growth)
+        else:
+            self.coint_beta = None
+            self.trend_growth = None
+
     @property
     def h(self) -> int:
         """Forecast horizon."""
@@ -119,11 +173,67 @@ class CLOVER(nn.Module):
             parts.append(self.future_mlp(futr_h.reshape(b, n_bottom, -1)))
 
         context = torch.cat(parts, dim=-1)
-        return self.head(self.decoder(context, futr_h))
+        params = self.head(self.decoder(context, futr_h))
+        return self._structure(params, batch)
+
+    def _structure(self, params, batch: WindowBatch):
+        """Cointegration structure: VECM mean adjustment and common-trend loadings.
+
+        The loading constraint is stated in raw units and mapped into the window's
+        normalized units through `batch.scale`, so a fixed cointegrating vector means
+        the same thing in every window; the mean adjustment acts in normalized units.
+        """
+        scale = None if batch.scale is None else batch.scale.scale.squeeze(1)  # [B, Nb]
+        updates = {}
+        if self.error_correction is not None and batch.hist_exog is not None:
+            last = batch.hist_exog[:, :, -1, :]  # [B, X, Nb]
+            if self.error_speed is not None:
+                table = self.error_correction[:, None, :] * self.error_speed[None]
+            else:
+                table = self.error_correction
+            # Normalized units on purpose: a raw-unit table would have to reach the
+            # size of a window's standard deviation, which Adam at these learning
+            # rates cannot do from zero in one run, leaving the term frozen.
+            shift = torch.einsum("bxn,hnx->bhn", last, table)
+            if params.mu.dim() == 4:  # a mixture carries a trailing component axis
+                shift = shift.unsqueeze(-1)
+            updates["mu"] = params.mu + shift
+        if self.coint_beta is not None:
+            updates["F"] = self._constrain_loadings(params.F, scale)
+        return replace(params, **updates) if updates else params
+
+    def _constrain_loadings(self, loadings: Tensor, scale: Tensor | None) -> Tensor:
+        """Project the first `trend_factors` loadings onto null(beta^T), raw units.
+
+        With `y_raw = scale * y_norm + loc`, the raw constraint `beta^T F_raw = 0`
+        reads `(scale * beta)^T F_norm = 0`, so the projection uses the window-scaled
+        vectors. The projected loadings then grow with the horizon, which is where a
+        common stochastic trend's variance goes; everything along the equilibrium
+        relations is left to the remaining factors and the idiosyncratic term.
+        """
+        k = self.trend_factors
+        b = loadings.shape[0]
+        beta = self.coint_beta.unsqueeze(0).expand(b, -1, -1)  # [B, Nb, R]
+        if scale is not None:
+            beta = beta * scale.unsqueeze(-1)
+        trend = loadings[..., :k]  # [B, H, Nb, k]
+        gram = beta.transpose(1, 2) @ beta  # [B, R, R]
+        ridge = EPS * gram.diagonal(dim1=-2, dim2=-1).mean(-1).clamp_min(EPS)
+        gram = gram + ridge[:, None, None] * torch.eye(gram.shape[-1], device=gram.device)
+        coef = torch.linalg.solve(
+            gram.unsqueeze(1), torch.einsum("bnr,bhnk->bhrk", beta, trend)
+        )
+        trend = trend - torch.einsum("bnr,bhrk->bhnk", beta, coef)
+        trend = trend * self.trend_growth.view(1, -1, 1, 1)
+        return torch.cat([trend, loadings[..., k:]], dim=-1)
 
     def _hist_channels(self, batch: WindowBatch, b: int) -> Tensor | None:
         """Lift bottom-level covariates to hierarchy rows, zero-padding the aggregates."""
-        if self.dims.n_hist_features == 0 or batch.hist_exog is None:
+        if (
+            self.dims.n_hist_features == 0
+            or batch.hist_exog is None
+            or not self.config.hist_to_encoder
+        ):
             return None
         hx = batch.hist_exog.permute(0, 3, 1, 2)  # [B, Nb, X, L]
         pad = hx.new_zeros(b, self.n_agg, hx.shape[2], hx.shape[3])

@@ -84,6 +84,7 @@ def test_unknown_feature_lists_alternatives(dataset: HierarchicalDataset) -> Non
 def test_registry_contains_every_shipped_builder() -> None:
     assert set(FEATURE_REGISTRY) >= {
         "dayofweek_dummies",
+        "equilibrium_error",
         "grouped_static_dummies",
         "identity_dummies",
         "month_dummies",

@@ -1,0 +1,327 @@
+[
+ {
+  "dataset": "synthetic_coint",
+  "variant": "base",
+  "seed": 0,
+  "scrps": {
+   "Overall": 0.019923335929376982,
+   "Total": 0.0076846963063853056,
+   "Group": 0.019248032074117027,
+   "Bottom": 0.03283727944257539
+  },
+  "best_val": 0.018452306725701303,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "base",
+  "seed": 1,
+  "scrps": {
+   "Overall": 0.019007523415624197,
+   "Total": 0.007104452431431968,
+   "Group": 0.017972133934915098,
+   "Bottom": 0.03194598391693993
+  },
+  "best_val": 0.018472515723320652,
+  "steps_run": 550
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "base",
+  "seed": 2,
+  "scrps": {
+   "Overall": 0.019565779423844486,
+   "Total": 0.007215244283129749,
+   "Group": 0.019190395353272674,
+   "Bottom": 0.032291698668436085
+  },
+  "best_val": 0.01853285697672624,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "base",
+  "seed": 3,
+  "scrps": {
+   "Overall": 0.019246550837516144,
+   "Total": 0.007138850108233362,
+   "Group": 0.018169883140769626,
+   "Bottom": 0.03243091930073629
+  },
+  "best_val": 0.01880813816563654,
+  "steps_run": 400
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "base",
+  "seed": 4,
+  "scrps": {
+   "Overall": 0.01981433238123399,
+   "Total": 0.007535586217686072,
+   "Group": 0.019351350515698397,
+   "Bottom": 0.03255606044400421
+  },
+  "best_val": 0.018181670549263743,
+  "steps_run": 750
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_skiponly:share",
+  "seed": 0,
+  "scrps": {
+   "Overall": 0.019999118937609483,
+   "Total": 0.007810109161269041,
+   "Group": 0.01927843367913903,
+   "Bottom": 0.03290881400753375
+  },
+  "best_val": 0.01860129240719422,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_skiponly:share",
+  "seed": 1,
+  "scrps": {
+   "Overall": 0.01920370863601355,
+   "Total": 0.00784910388097105,
+   "Group": 0.017860893760201293,
+   "Bottom": 0.03190112830388026
+  },
+  "best_val": 0.018538405777432185,
+  "steps_run": 500
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_skiponly:share",
+  "seed": 2,
+  "scrps": {
+   "Overall": 0.01942236782706147,
+   "Total": 0.007655655812924065,
+   "Group": 0.01861934669567027,
+   "Bottom": 0.03199210100717448
+  },
+  "best_val": 0.018541638724741166,
+  "steps_run": 450
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_skiponly:share",
+  "seed": 3,
+  "scrps": {
+   "Overall": 0.020290418595442377,
+   "Total": 0.007976535008965044,
+   "Group": 0.019549350715049887,
+   "Bottom": 0.03334537009786861
+  },
+  "best_val": 0.01878631419125157,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_skiponly:share",
+  "seed": 4,
+  "scrps": {
+   "Overall": 0.01952374511854184,
+   "Total": 0.007865074525799197,
+   "Group": 0.018698103586836722,
+   "Bottom": 0.032008057277448626
+  },
+  "best_val": 0.018264766509287097,
+  "steps_run": 450
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_sep_skiponly:share",
+  "seed": 0,
+  "scrps": {
+   "Overall": 0.01988745138412384,
+   "Total": 0.00776972697774832,
+   "Group": 0.019060126184023092,
+   "Bottom": 0.03283250102621843
+  },
+  "best_val": 0.018469744483066396,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_sep_skiponly:share",
+  "seed": 1,
+  "scrps": {
+   "Overall": 0.018967074825775577,
+   "Total": 0.00715265140540368,
+   "Group": 0.017884177319364227,
+   "Bottom": 0.031864395789055845
+  },
+  "best_val": 0.018470654258855062,
+  "steps_run": 550
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_sep_skiponly:share",
+  "seed": 2,
+  "scrps": {
+   "Overall": 0.019221280706474334,
+   "Total": 0.0070704918984391225,
+   "Group": 0.018714142926293247,
+   "Bottom": 0.03187920732834013
+  },
+  "best_val": 0.018456385581540658,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_sep_skiponly:share",
+  "seed": 3,
+  "scrps": {
+   "Overall": 0.02051774866992811,
+   "Total": 0.008097491514939796,
+   "Group": 0.019938139372375954,
+   "Bottom": 0.033517615157256604
+  },
+  "best_val": 0.018735491155183068,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_sep_skiponly:share",
+  "seed": 4,
+  "scrps": {
+   "Overall": 0.019549116048393413,
+   "Total": 0.007944848354749592,
+   "Group": 0.018634437929211056,
+   "Bottom": 0.032068061896112984
+  },
+  "best_val": 0.018245275353039575,
+  "steps_run": 450
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "trend:share",
+  "seed": 0,
+  "scrps": {
+   "Overall": 0.020041152499305617,
+   "Total": 0.008082196629875329,
+   "Group": 0.019758319328297216,
+   "Bottom": 0.03228294157147666
+  },
+  "best_val": 0.01877925253486487,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "trend:share",
+  "seed": 1,
+  "scrps": {
+   "Overall": 0.0192548638371171,
+   "Total": 0.007633330551827857,
+   "Group": 0.01804790217081751,
+   "Bottom": 0.032083358825515274
+  },
+  "best_val": 0.018539855431138588,
+  "steps_run": 550
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "trend:share",
+  "seed": 2,
+  "scrps": {
+   "Overall": 0.01910596356556608,
+   "Total": 0.0072702048274442535,
+   "Group": 0.018602648985718735,
+   "Bottom": 0.03144503691637207
+  },
+  "best_val": 0.01892353732003404,
+  "steps_run": 450
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "trend:share",
+  "seed": 3,
+  "scrps": {
+   "Overall": 0.01968840218677464,
+   "Total": 0.009042549255815277,
+   "Group": 0.019027951303282102,
+   "Bottom": 0.03099470603209317
+  },
+  "best_val": 0.018498118177845833,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "trend:share",
+  "seed": 4,
+  "scrps": {
+   "Overall": 0.019457332660898056,
+   "Total": 0.00784599834757011,
+   "Group": 0.01892143616731832,
+   "Bottom": 0.03160456350028983
+  },
+  "best_val": 0.01880208807348141,
+  "steps_run": 450
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_trend_skiponly:share",
+  "seed": 0,
+  "scrps": {
+   "Overall": 0.01979855472693668,
+   "Total": 0.007820416509666112,
+   "Group": 0.01893079745693869,
+   "Bottom": 0.032644450249733385
+  },
+  "best_val": 0.018383012746308075,
+  "steps_run": 650
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_trend_skiponly:share",
+  "seed": 1,
+  "scrps": {
+   "Overall": 0.019502127207639712,
+   "Total": 0.0074695535221196005,
+   "Group": 0.01855368274614943,
+   "Bottom": 0.03248314539083143
+  },
+  "best_val": 0.018432081095983443,
+  "steps_run": 900
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_trend_skiponly:share",
+  "seed": 2,
+  "scrps": {
+   "Overall": 0.018994544157915526,
+   "Total": 0.007367338149622015,
+   "Group": 0.018124735168811305,
+   "Bottom": 0.03149155918997655
+  },
+  "best_val": 0.01847919850050322,
+  "steps_run": 700
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_trend_skiponly:share",
+  "seed": 3,
+  "scrps": {
+   "Overall": 0.020646205356085395,
+   "Total": 0.007526491351803681,
+   "Group": 0.02059064139689979,
+   "Bottom": 0.03382148335273298
+  },
+  "best_val": 0.01831576917201954,
+  "steps_run": 950
+ },
+ {
+  "dataset": "synthetic_coint",
+  "variant": "ec_trend_skiponly:share",
+  "seed": 4,
+  "scrps": {
+   "Overall": 0.019995720653271692,
+   "Total": 0.007614856640468588,
+   "Group": 0.019572417082050056,
+   "Bottom": 0.03279988827098441
+  },
+  "best_val": 0.0179197781996565,
+  "steps_run": 700
+ }
+]

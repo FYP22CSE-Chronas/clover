@@ -67,3 +67,16 @@ def test_block_split_rejects_wrong_totals() -> None:
 def test_unknown_strategy_is_rejected() -> None:
     with pytest.raises(ValueError, match="unknown split strategy"):
         SplitConfig(strategy="nope")
+
+
+def test_start_date_truncates_the_front() -> None:
+    from dataclasses import replace
+
+    from config import load_config
+    from data import load
+
+    config = load_config("synthetic_coint")
+    full = load("synthetic_coint", config.data)
+    short = load("synthetic_coint", replace(config.data, start_date="2005-01-01"))
+    assert short.n_steps == 180
+    np.testing.assert_array_equal(short.bottom, full.bottom[-180:])

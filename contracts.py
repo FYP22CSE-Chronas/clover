@@ -15,6 +15,9 @@ class WindowBatch:
     futr_exog: Tensor | None = None  # [B, F, L+H, Nb]
     hist_exog: Tensor | None = None  # [B, X, L, Nb]
     stat_exog: Tensor | None = None  # [Nb, S] or [B, Nb, S]
+    # The (loc, scale) that produced insample_y. Lets a structural constraint stated
+    # in raw units (a cointegrating vector) be applied inside the model exactly.
+    scale: ScaleStats | None = None
 
 
 @dataclass(frozen=True)

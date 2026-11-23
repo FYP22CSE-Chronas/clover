@@ -23,6 +23,7 @@ def test_every_shipped_dataset_has_a_config() -> None:
         "m5",
         "police",
         "prison",
+        "synthetic_coint",
         "tourism_large",
         "tourism_small",
         "traffic",
