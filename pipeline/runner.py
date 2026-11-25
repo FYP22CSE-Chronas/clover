@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 import torch
 
-from config import ModelDims, RunConfig
+from config import EvalConfig, ModelDims, RunConfig
 from data import build_features, build_split, load
 from data.dataset import ExogenousFeatures, HierarchicalDataset
 from data.features import check_anchor_lags
 from data.windows import WindowSplit
+from model.adaptive import adaptive_sample
 from model.distribution import sample_coherent
 from model.network import CLOVER
 from model.normalization import denormalize_params
@@ -79,7 +82,13 @@ def run(
         batcher(split.train), batcher(split.val), checkpoint_dir=checkpoint_dir
     )
 
-    samples = forecast(model, batcher(split.test), config.eval.num_samples)
+    samples = forecast(
+        model,
+        batcher(split.test),
+        config.eval.num_samples,
+        config.eval,
+        dataset.level_slices,
+    )
     test_t = split.test[0].t
     y_true = dataset.values[test_t : test_t + config.data.h].T.astype(np.float64)
     scores = scrps_by_level(
@@ -102,10 +111,35 @@ def run(
 
 
 @torch.no_grad()
-def forecast(model: CLOVER, batcher: WindowBatcher, num_samples: int) -> np.ndarray:
-    """Coherent predictive samples for the first window of `batcher`, [Na+Nb, h, N]."""
+def forecast(
+    model: CLOVER,
+    batcher: WindowBatcher,
+    num_samples: int,
+    eval_config: EvalConfig | None = None,
+    level_slices: Mapping[str, tuple[int, int]] | None = None,
+) -> np.ndarray:
+    """Coherent predictive samples for the first window of `batcher`, [Na+Nb, h, N].
+
+    `eval_config.stratified` draws Latin hypercube noise; `eval_config.adaptive`
+    lets `adaptive_sample` choose the sample count (checked per `level_slices`
+    level) instead of `num_samples`.
+    """
     model.eval()
     batch = batcher.batch([0])
     params = denormalize_params(model(batch.windows), batch.scale)
-    hierarchy = sample_coherent(params, model.S, num_samples).hierarchy
+    stratified = eval_config is not None and eval_config.stratified
+    if eval_config is not None and eval_config.adaptive:
+        hierarchy = adaptive_sample(
+            params,
+            model.S,
+            n_pilot=eval_config.adaptive_pilot,
+            n_max=eval_config.adaptive_max,
+            tol=eval_config.adaptive_tol,
+            level_slices=level_slices,
+            stratified=stratified,
+        ).hierarchy
+    else:
+        hierarchy = sample_coherent(
+            params, model.S, num_samples, stratified=stratified
+        ).hierarchy
     return hierarchy.squeeze(0).permute(1, 0, 2).cpu().numpy()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import Tensor
 
@@ -15,12 +17,42 @@ from contracts import (
 )
 
 
+def standard_normal(
+    *shape: int,
+    stratified: bool = False,
+    generator: torch.Generator | None = None,
+    device: torch.device | None = None,
+    dtype: torch.dtype | None = None,
+) -> Tensor:
+    """Standard normal draws whose trailing axis is the sample axis.
+
+    `stratified=True` is Latin hypercube sampling: along the sample axis every
+    coordinate gets exactly one draw in each of the `n` equal-probability strata
+    `[k/n, (k+1)/n)`, pushed through `Phi^{-1}`, with an independent random
+    permutation per coordinate. Every marginal is still exactly N(0, 1) and
+    coordinates stay independent across a joint draw, so samplers built on it remain
+    unbiased and coherent, while quantile estimates of any monotone function of one
+    coordinate (e.g. a DSF innovation) lose almost all their Monte Carlo noise.
+    """
+    kw = {"device": device, "dtype": dtype, "generator": generator}
+    if not stratified:
+        return torch.randn(*shape, **kw)
+    n = shape[-1]
+    perm = torch.argsort(torch.rand(*shape, **kw), dim=-1).to(dtype or torch.get_default_dtype())
+    u = ((perm + torch.rand(*shape, **kw)) / n).clamp(1e-6, 1.0 - 1e-6)
+    return math.sqrt(2.0) * torch.erfinv(2.0 * u - 1.0)
+
+
 def sample_factor_model(
-    params: FactorParams, num_samples: int, generator: torch.Generator | None = None
+    params: FactorParams,
+    num_samples: int,
+    generator: torch.Generator | None = None,
+    stratified: bool = False,
 ) -> Tensor:
     """Draw `mu + sigma * z + F @ eps`, differentiable through the noise.
 
-    Returns bottom-level samples shaped [..., Nb, num_samples].
+    Returns bottom-level samples shaped [..., Nb, num_samples]. `stratified` draws
+    `z`/`eps` by Latin hypercube (see `standard_normal`).
     """
     mu, sigma, loadings = params.mu, params.sigma, params.F
     if mu.shape != sigma.shape:
@@ -32,8 +64,8 @@ def sample_factor_model(
     lead, n_bottom = mu.shape[:-1], mu.shape[-1]
     n_factors = loadings.shape[-1]
     kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
-    z = torch.randn(*lead, n_bottom, num_samples, **kw)
-    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    z = standard_normal(*lead, n_bottom, num_samples, stratified=stratified, **kw)
+    eps = standard_normal(*lead, n_factors, num_samples, stratified=stratified, **kw)
     factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
     return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * z + factor_term
 
@@ -110,7 +142,10 @@ def _dsf_transform(x: Tensor, w: Tensor, a: Tensor, b: Tensor) -> Tensor:
 
 
 def sample_flow_factor_model(
-    params: FlowParams, num_samples: int, generator: torch.Generator | None = None
+    params: FlowParams,
+    num_samples: int,
+    generator: torch.Generator | None = None,
+    stratified: bool = False,
 ) -> Tensor:
     """Draw `mu + sigma * t + F @ eps`, `t` a conditional-normalizing-flow innovation.
 
@@ -120,6 +155,8 @@ def sample_flow_factor_model(
     shape -- skew, tail weight, and (with enough flow units) multimodality -- is
     learned from data. Reparameterized through `z` exactly like `sample_factor_model`,
     so `generator` reproduces draws and gradients reach the flow parameters.
+    `stratified` draws `z`/`eps` by Latin hypercube (see `standard_normal`); since
+    the flow is monotone, stratifying `z` stratifies the innovation's quantiles.
     """
     mu, sigma, loadings = params.mu, params.sigma, params.F
     w, a, b = params.flow_w, params.flow_a, params.flow_b
@@ -143,10 +180,10 @@ def sample_flow_factor_model(
     n_factors = loadings.shape[-1]
     kw = {"device": mu.device, "dtype": mu.dtype, "generator": generator}
 
-    z = torch.randn(*lead, n_bottom, num_samples, **kw)
+    z = standard_normal(*lead, n_bottom, num_samples, stratified=stratified, **kw)
     t = _dsf_transform(z, w, a, b)
 
-    eps = torch.randn(*lead, n_factors, num_samples, **kw)
+    eps = standard_normal(*lead, n_factors, num_samples, stratified=stratified, **kw)
     factor_term = torch.einsum("...bk,...kn->...bn", loadings, eps)
     return mu.unsqueeze(-1) + sigma.unsqueeze(-1) * t + factor_term
 
@@ -468,6 +505,7 @@ def sample_coherent(
     num_samples: int,
     generator: torch.Generator | None = None,
     clip: bool = True,
+    stratified: bool = False,
 ) -> ForecastSamples:
     """Sample the bottom-level distribution and aggregate through S in one call.
 
@@ -476,7 +514,8 @@ def sample_coherent(
     flow samples, `DDSFParams` draws deep-dense-sigmoidal-flow samples,
     `CopulaSplineParams` draws Gaussian-copula spline-marginal samples,
     `CopulaFlowParams` draws Gaussian-copula spline-then-flow samples, `GMMParams`
-    draws Gaussian-mixture samples.
+    draws Gaussian-mixture samples. `stratified` (Latin hypercube noise, see
+    `standard_normal`) is supported for `FactorParams` and `FlowParams` only.
     """
     if isinstance(params, SkewTParams):
         sampler = sample_skew_t_factor_model
@@ -492,7 +531,14 @@ def sample_coherent(
         sampler = sample_gmm_factor_model
     else:
         sampler = sample_factor_model
-    bottom = sampler(params, num_samples, generator=generator)
+    if stratified:
+        if sampler not in (sample_factor_model, sample_flow_factor_model):
+            raise ValueError(
+                f"stratified sampling is not supported for {type(params).__name__}"
+            )
+        bottom = sampler(params, num_samples, generator=generator, stratified=True)
+    else:
+        bottom = sampler(params, num_samples, generator=generator)
     return ForecastSamples(
         bottom=bottom, hierarchy=coherent_aggregate(S, bottom, clip=clip)
     )

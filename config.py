@@ -145,8 +145,22 @@ class EvalConfig:
     num_samples: int = 1000
     estimator: str = "quantile"
     quantile_step: float = 0.01
+    # Latin hypercube noise (factor_model / normalizing_flow heads): same
+    # distribution, far less Monte Carlo noise in the sampled quantiles.
+    stratified: bool = False
+    # Adaptive budget: a pilot of `adaptive_pilot` draws is topped up to at most
+    # `adaptive_max` so the predicted sCRPS inflation from Monte Carlo noise is
+    # <= `adaptive_tol` on every level; replaces `num_samples` when enabled.
+    adaptive: bool = False
+    adaptive_pilot: int = 200
+    adaptive_max: int = 5000
+    adaptive_tol: float = 2e-4
 
     def __post_init__(self) -> None:
+        if not 2 <= self.adaptive_pilot <= self.adaptive_max:
+            raise ValueError("need 2 <= adaptive_pilot <= adaptive_max")
+        if self.adaptive_tol <= 0:
+            raise ValueError("adaptive_tol must be > 0")
         if self.estimator not in ("quantile", "mc"):
             raise ValueError(
                 f"estimator must be 'quantile' or 'mc', got {self.estimator!r}"

@@ -30,3 +30,10 @@ eval:
   num_samples: 1000
   estimator: quantile
   quantile_step: 0.01
+  # Latin hypercube noise; supported by factor_model and normalizing_flow heads.
+  stratified: false
+  # Adaptive budget: pilot, then top up until predicted sCRPS inflation <= tol.
+  adaptive: false
+  adaptive_pilot: 200
+  adaptive_max: 5000
+  adaptive_tol: 2.0e-4
