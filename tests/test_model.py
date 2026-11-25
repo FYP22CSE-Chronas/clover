@@ -4,10 +4,12 @@ import numpy as np
 import pytest
 import torch
 
-from config import ModelConfig, ModelDims
-from contracts import WindowBatch
-from model.mixers import MIXERS
+from config import ModelConfig, ModelDims, SplitConfig
+from contracts import ScaleStats, WindowBatch
+from data import build_features, build_split
+from model.mixers import MIXERS, CrossSeriesGNNMixer, hierarchy_edges
 from model.network import CLOVER
+from pipeline.batching import WindowBatcher
 
 B, L, H = 2, 8, 4
 
@@ -90,6 +92,151 @@ def test_disabled_cross_series_mlp_matches_identity(S: np.ndarray) -> None:
     )
     h = torch.randn(B, n_hier, 5)
     torch.testing.assert_close(mixer(h), h[:, -n_bottom:])
+
+
+def test_hierarchy_edges_link_bottoms_to_their_aggregates(S: np.ndarray) -> None:
+    src, dst = hierarchy_edges(S)
+    edges = set(zip(src.tolist(), dst.tolist(), strict=True))
+    # Total (0) touches every bottom (3..6); group 1 has 3,4; group 2 has 5,6.
+    expected = {(0, b) for b in range(3, 7)} | {(1, 3), (1, 4), (2, 5), (2, 6)}
+    expected |= {(d, s) for s, d in expected}
+    assert edges == expected
+
+
+def test_disabled_cross_series_gnn_matches_identity(S: np.ndarray) -> None:
+    n_hier, n_bottom = S.shape
+    mixer = MIXERS.create(
+        "cross_series_gnn",
+        n_hierarchy=n_hier,
+        n_bottom=n_bottom,
+        channels=5,
+        hidden_size=0,
+        S=S,
+    )
+    h = torch.randn(B, n_hier, 5)
+    torch.testing.assert_close(mixer(h), h[:, -n_bottom:])
+
+
+def test_cross_series_gnn_only_mixes_linked_series() -> None:
+    """Two disjoint groups and no total: a change in one never reaches the other."""
+    A = np.array([[1, 1, 0, 0], [0, 0, 1, 1]], dtype=np.float32)
+    S = np.vstack([A, np.eye(4, dtype=np.float32)])
+    torch.manual_seed(0)
+    mixer = MIXERS.create(
+        "cross_series_gnn", n_hierarchy=6, n_bottom=4, channels=5, hidden_size=8, S=S
+    )
+    h = torch.randn(B, 6, 5)
+    bumped = h.clone()
+    bumped[:, 2] += 1.0  # bottom series 0 (node 2), in the first group
+    delta = (mixer(bumped) - mixer(h)).abs().amax(dim=(0, 2))
+    assert delta[1] > 0  # its sibling hears it through the shared aggregate
+    torch.testing.assert_close(delta[2:], torch.zeros(2))
+
+
+def test_cross_series_gnn_rejects_mismatched_S(S: np.ndarray) -> None:
+    with pytest.raises(ValueError, match="S has shape"):
+        MIXERS.create(
+            "cross_series_gnn",
+            n_hierarchy=6,
+            n_bottom=4,
+            channels=5,
+            hidden_size=8,
+            S=S,
+        )
+
+
+def _gnn(S: np.ndarray, **kwargs) -> CrossSeriesGNNMixer:
+    n_hier, n_bottom = S.shape
+    return MIXERS.create(
+        "cross_series_gnn",
+        n_hierarchy=n_hier,
+        n_bottom=n_bottom,
+        channels=5,
+        hidden_size=8,
+        S=S,
+        **kwargs,
+    )
+
+
+def _stats(n_bottom: int) -> ScaleStats:
+    return ScaleStats(
+        loc=torch.rand(B, 1, n_bottom) * 10, scale=torch.rand(B, 1, n_bottom) + 0.5
+    )
+
+
+def test_magnitude_features_sum_children_into_aggregates(S: np.ndarray) -> None:
+    mixer = _gnn(S)
+    stats = _stats(S.shape[1])
+    feats = mixer.magnitude_features(torch.zeros(B, S.shape[0], 5), stats)
+    S_t = torch.as_tensor(S)
+    loc = stats.loc[:, 0] @ S_t.T
+    log_scale = (stats.scale[:, 0] @ S_t.T).log()
+    torch.testing.assert_close(feats[..., 0], log_scale - log_scale.mean(1, keepdim=True))
+    torch.testing.assert_close(feats[..., 1], torch.asinh(loc / log_scale.exp()))
+
+
+def test_magnitude_features_ignore_a_common_change_of_units(S: np.ndarray) -> None:
+    """Measuring every series in other units must not change what the GNN sees."""
+    mixer = _gnn(S)
+    stats = _stats(S.shape[1])
+    rescaled = ScaleStats(loc=stats.loc * 1000.0, scale=stats.scale * 1000.0)
+    h = torch.zeros(B, S.shape[0], 5)
+    torch.testing.assert_close(
+        mixer.magnitude_features(h, stats), mixer.magnitude_features(h, rescaled)
+    )
+
+
+def test_scale_features_make_the_gnn_depend_on_stats(S: np.ndarray) -> None:
+    torch.manual_seed(0)
+    h, stats = torch.randn(B, S.shape[0], 5), _stats(S.shape[1])
+    on = _gnn(S)
+    assert not torch.allclose(on(h, stats), on(h, None))
+    off = _gnn(S, scale_features=False)
+    torch.testing.assert_close(off(h, stats), off(h, None))
+
+
+def test_scale_features_travel_mainly_along_the_graph() -> None:
+    """A series' magnitude reaches its sibling through their shared aggregate.
+
+    The relative log scale is centered on a window-wide mean, so a disjoint group
+    still sees a small shift through that mean -- but only through it, so its
+    response must be far weaker than the sibling's.
+    """
+    A = np.array([[1, 1, 0, 0], [0, 0, 1, 1]], dtype=np.float32)
+    S = np.vstack([A, np.eye(4, dtype=np.float32)])
+    torch.manual_seed(0)
+    mixer = _gnn(S)
+    h, stats = torch.randn(B, 6, 5), _stats(4)
+    bumped = ScaleStats(loc=stats.loc.clone(), scale=stats.scale.clone())
+    bumped.scale[:, :, 0] *= 5.0
+    delta = (mixer(h, bumped) - mixer(h, stats)).abs().amax(dim=(0, 2))
+    assert delta[1] > 2 * delta[2:].max()
+
+
+def test_batcher_hands_the_model_its_normalization_stats(dataset) -> None:
+    features = build_features(dataset)
+    split = build_split(dataset.bottom, L, H, SplitConfig())
+    batch = WindowBatcher(split.train, features, input_size=L, h=H).batch([0, 1])
+    assert batch.windows.stats is batch.scale
+
+
+def test_clover_passes_stats_to_the_gnn(S: np.ndarray) -> None:
+    torch.manual_seed(0)
+    model = CLOVER(
+        ModelConfig(temp_conv_channels=6, n_factors=3, mixer="cross_series_gnn"),
+        ModelDims(h=H, input_size=L),
+        S,
+    )
+    batch = _batch(S.shape[1])
+    with_stats = WindowBatch(insample_y=batch.insample_y, stats=_stats(S.shape[1]))
+    assert not torch.allclose(model(batch).mu, model(with_stats).mu)
+
+
+@pytest.mark.parametrize("mixer", ["cross_series_gnn", "cross_series_mlp", "identity"])
+def test_forward_with_each_mixer(S: np.ndarray, mixer: str) -> None:
+    dims = ModelDims(h=H, input_size=L)
+    model = CLOVER(ModelConfig(temp_conv_channels=6, n_factors=3, mixer=mixer), dims, S)
+    assert model(_batch(S.shape[1])).mu.shape == (B, H, S.shape[1])
 
 
 def test_gradients_reach_every_parameter(model: CLOVER) -> None:

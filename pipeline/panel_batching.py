@@ -76,6 +76,7 @@ class PanelBatcher:
                 futr_exog=self._futr_exog(groups, ts),
                 hist_exog=self._hist_exog(ts),
                 stat_exog=self._stat_exog(groups),
+                stats=stats,
             ),
             target_bottom=_tensor(target, self.device),
             scale=stats,

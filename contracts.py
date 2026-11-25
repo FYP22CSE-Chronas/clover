@@ -15,6 +15,9 @@ class WindowBatch:
     futr_exog: Tensor | None = None  # [B, F, L+H, Nb]
     hist_exog: Tensor | None = None  # [B, X, L, Nb]
     stat_exog: Tensor | None = None  # [Nb, S] or [B, Nb, S]
+    # The window statistics the inputs were normalized by. Normalization hides how
+    # large each series is; a mixer that weighs series against each other needs it.
+    stats: ScaleStats | None = None
 
 
 @dataclass(frozen=True)

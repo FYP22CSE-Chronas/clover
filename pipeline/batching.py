@@ -43,6 +43,7 @@ class WindowBatcher:
                 insample_y=normalize(insample, stats),
                 futr_exog=self._futr_exog([w.t for w in chosen], stats),
                 stat_exog=self._stat,
+                stats=stats,
             ),
             target_bottom=target,
             scale=stats,

@@ -45,12 +45,22 @@ class CLOVER(nn.Module):
             kernel_size=config.kernel_size,
             residual=config.conv_residual,
         )
-        self.mixer = MIXERS.create(
-            config.mixer,
-            n_hierarchy=self.n_hierarchy,
-            n_bottom=self.n_bottom,
-            channels=self.encoder.out_channels,
-            hidden_size=config.cross_series_hidden,
+        mixer_factory = MIXERS.get(config.mixer)
+        mixer_kwargs = {
+            "n_hierarchy": self.n_hierarchy,
+            "n_bottom": self.n_bottom,
+            "channels": self.encoder.out_channels,
+            "hidden_size": config.cross_series_hidden,
+            "S": S_t,
+        }
+        # Only graph mixers declare S; the rest keep their original signature.
+        mixer_accepted = inspect.signature(mixer_factory).parameters
+        self.mixer = mixer_factory(
+            **{k: v for k, v in mixer_kwargs.items() if k in mixer_accepted}
+        )
+        # Mixers whose forward declares `stats` also get the window statistics.
+        self._mixer_takes_stats = (
+            "stats" in inspect.signature(self.mixer.forward).parameters
         )
 
         self.static_mlp = (
@@ -104,7 +114,12 @@ class CLOVER(nn.Module):
             )
 
         y_hier = torch.einsum("ij,bjl->bil", self.S, batch.insample_y.permute(0, 2, 1))
-        h_hist = self.mixer(self.encoder(y_hier, self._hist_channels(batch, b)))
+        h_enc = self.encoder(y_hier, self._hist_channels(batch, b))
+        h_hist = (
+            self.mixer(h_enc, batch.stats)
+            if self._mixer_takes_stats
+            else self.mixer(h_enc)
+        )
 
         parts = [h_hist]
         if self.static_mlp is not None and batch.stat_exog is not None:
