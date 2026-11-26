@@ -12,9 +12,16 @@ data:
     Gender/Geography: [9, 25]
     Status/Gender/Geography: [25, 57]
 
+# The paper's Table 4 gives Labour a static and a future encoder. Bottom names are
+# list strings like "['Employed full-time', 'Females', 'Victoria']", hence the
+# separator. Without these features CLOVER scores 0.0081 overall here, 0.0077 with
+# them (the paper reports 0.0074).
 features:
-  static: []
-  future: []
+  static:
+    - {type: grouped_static_dummies, keys: [status, gender, geography],
+       sep: "', '", positions: [0, 1, 2]}
+  future:
+    - {type: month_dummies}
 
 model:
   temp_conv_channels: 20
