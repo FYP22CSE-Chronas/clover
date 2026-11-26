@@ -1,0 +1,23 @@
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{Labour, last 12 m} & \multicolumn{2}{c}{Labour, rolling} & \multicolumn{2}{c}{Synthetic} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Variant & $\Delta$ & $n$ & $\Delta$ & $n$ & $\Delta$ & $n$ \\
+\midrule
+RIC: differences, tree target, analytic shrinkage & -3.6\% & 12 & -1.7\% & 12 & -4.8\% & 12 \\
+\quad identity target instead of tree & -4.1\% & 12 & -1.6\% & 12 & -4.3\% & 12 \\
+\quad fixed shrinkage $\lambda{=}0.5$ toward $I$ & -2.9\% & 5 & -2.7\% & 5 & -- &  \\
+\quad levels instead of differences & -0.2\% & 5 & +1.4\% & 5 & -- &  \\
+\quad levels, identity target, $\lambda{=}0.5$ & -1.2\% & 12 & +0.3\% & 12 & +0.6\% & 12 \\
+\quad no cross-series dependence at all & -3.2\% & 5 & +0.1\% & 5 & -3.1\% & 12 \\
+\quad gated mix with the network's own loadings & -2.7\% & 5 & -2.1\% & 5 & -- &  \\
+\quad $\eta$-step changes for horizon $\eta$ & -3.9\% & 5 & +1.1\% & 5 & -- &  \\
+\quad 60-row estimation history & -3.4\% & 5 & -2.4\% & 5 & -- &  \\
+\quad 120-row estimation history & -3.7\% & 5 & +0.5\% & 5 & -- &  \\
+\quad full history & -2.0\% & 5 & -2.0\% & 5 & -- &  \\
+\quad attenuation $\rho{=}0.8$ & -4.2\% & 12 & -2.0\% & 12 & -4.4\% & 12 \\
+\quad attenuation $\rho{=}0.65$ & -4.2\% & 12 & -2.1\% & 12 & -3.9\% & 12 \\
+\quad attenuation $\rho{=}0.5$ & -3.5\% & 12 & -2.1\% & 12 & -3.7\% & 12 \\
+\quad attenuation, learned $\rho_\eta$ & -3.5\% & 12 & -2.0\% & 12 & -4.3\% & 12 \\
+\bottomrule
+\end{tabular}
