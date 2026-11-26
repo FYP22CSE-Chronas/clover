@@ -1,0 +1,490 @@
+{
+  "world_mortality": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.02355433766446673,
+          "std": 0.006558543334841958,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.02281282819036901,
+          "std": 0.0035656849002666377,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.024567088696070046,
+          "std": 0.0015467309131939895,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -3.1480803436741787,
+        "delta_pct.copula_spline": 4.299637060612908
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.015327147771147544,
+          "std": 0.008296689566650606,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.014830477196504169,
+          "std": 0.004428849763398962,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.018425151542602995,
+          "std": 0.002823153847658743,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -3.2404631446062577,
+        "delta_pct.copula_spline": 20.212526281551614
+      },
+      "Continent": {
+        "factor_model": {
+          "mean": 0.02078010282615702,
+          "std": 0.0065722804169732465,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.020553311541761897,
+          "std": 0.0035677126730725324,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.02243045921888549,
+          "std": 0.0019513696318108206,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -1.0913867284123748,
+        "delta_pct.copula_spline": 7.942003013820887
+      },
+      "Country": {
+        "factor_model": {
+          "mean": 0.03455576239609563,
+          "std": 0.004868426696659962,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.03305469583284095,
+          "std": 0.0027638012721294025,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.03284565532672166,
+          "std": 0.0014164133218491357,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -4.343896528887706,
+        "delta_pct.copula_spline": -4.948833279300459
+      }
+    },
+    "n_params": {
+      "factor_model": 410909,
+      "normalizing_flow": 412541,
+      "copula_spline": 412450
+    },
+    "seconds": {
+      "factor_model": 398.38857769966125,
+      "normalizing_flow": 482.11482429504395,
+      "copula_spline": 351.99200201034546
+    }
+  },
+  "nyc_crashes": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.42013852722075795,
+          "std": 0.030648198063220177,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.42722086320412017,
+          "std": 0.01900685428687117,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.4099259912921305,
+          "std": 0.018640410012130838,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": 1.685714478558371,
+        "delta_pct.copula_spline": -2.430754445726276
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.2668474455254856,
+          "std": 0.04691631886201929,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.28272645962457876,
+          "std": 0.030645953435161827,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.25598754006962865,
+          "std": 0.0361013569183232,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": 5.950596254659144,
+        "delta_pct.copula_spline": -4.069705608187948
+      },
+      "Borough": {
+        "factor_model": {
+          "mean": 0.3028768202785587,
+          "std": 0.03724752009804939,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.3108368241352569,
+          "std": 0.022641880133835175,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.29152007487172804,
+          "std": 0.01771894062673556,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": 2.628132403588118,
+        "delta_pct.copula_spline": -3.7496251434447094
+      },
+      "ZIP": {
+        "factor_model": {
+          "mean": 0.6906913158582295,
+          "std": 0.01473621206239523,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.6880993058525248,
+          "std": 0.009025940860459776,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.6822703589350347,
+          "std": 0.0062536350209414044,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -0.3752776307146709,
+        "delta_pct.copula_spline": -1.219207007508294
+      }
+    },
+    "n_params": {
+      "factor_model": 713093,
+      "normalizing_flow": 715373,
+      "copula_spline": 715255
+    },
+    "seconds": {
+      "factor_model": 719.3520328998566,
+      "normalizing_flow": 834.4905993938446,
+      "copula_spline": 989.3109624385834
+    }
+  },
+  "sl_tourism": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.2689812960020053,
+          "std": 0.03704446985179336,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.23101498652278113,
+          "std": 0.021821832033154926,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.20948002734523005,
+          "std": 0.025999148199294993,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -14.11485112293501,
+        "delta_pct.copula_spline": -22.120968833584502
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.2101714827512755,
+          "std": 0.05623945744616452,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.1551411927335818,
+          "std": 0.017847408900505637,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.13125955323897184,
+          "std": 0.01556008846856386,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -26.18351895191154,
+        "delta_pct.copula_spline": -37.54644944180695
+      },
+      "Continent": {
+        "factor_model": {
+          "mean": 0.24512726933955106,
+          "std": 0.04368481976135634,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.20158431421123546,
+          "std": 0.02350084531109535,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.17262609995317937,
+          "std": 0.0232111019009603,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -17.763407247848775,
+        "delta_pct.copula_spline": -29.576949794982966
+      },
+      "Region": {
+        "factor_model": {
+          "mean": 0.2870766029550761,
+          "std": 0.03327081068255492,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.2485964326382283,
+          "std": 0.018575457069859733,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.22557318215110578,
+          "std": 0.03238373662827147,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -13.404147158195768,
+        "delta_pct.copula_spline": -21.424045070505045
+      },
+      "Country": {
+        "factor_model": {
+          "mean": 0.33354982896211854,
+          "std": 0.039668004883457,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.3187380065080788,
+          "std": 0.02893250423410991,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.3084612740376632,
+          "std": 0.03837102471676723,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -4.440662584096817,
+        "delta_pct.copula_spline": -7.52168124400527
+      }
+    },
+    "n_params": {
+      "factor_model": 446609,
+      "normalizing_flow": 448481,
+      "copula_spline": 448380
+    },
+    "seconds": {
+      "factor_model": 628.0624001026154,
+      "normalizing_flow": 1759.2907118797302,
+      "copula_spline": 1186.6776542663574
+    }
+  },
+  "sl_covid_cases": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.24633618583047,
+          "std": 0.026615876978398144,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.2616491107932807,
+          "std": 0.038288063869589904,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.24208717810414188,
+          "std": 0.01669363527138661,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": 6.216271032689089,
+        "delta_pct.copula_spline": -1.7248816742061304
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.14206797651906955,
+          "std": 0.022423415336596423,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.17690363380688304,
+          "std": 0.04352323222190833,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.13826612922957118,
+          "std": 0.03359617258299308,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": 24.52041490373276,
+        "delta_pct.copula_spline": -2.6760761873651737
+      },
+      "Province": {
+        "factor_model": {
+          "mean": 0.23337741994402833,
+          "std": 0.024250130990203428,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.256596657067305,
+          "std": 0.04071673407024275,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.2390574090969581,
+          "std": 0.017547228784404942,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": 9.949221792256258,
+        "delta_pct.copula_spline": 2.433821212991397
+      },
+      "District": {
+        "factor_model": {
+          "mean": 0.3635631610283121,
+          "std": 0.040031095945316245,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.35144704150565387,
+          "std": 0.032473476599852294,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.3489379959858964,
+          "std": 0.009403254445682463,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -3.3326037457669426,
+        "delta_pct.copula_spline": -4.0227301911033715
+      }
+    },
+    "n_params": {
+      "factor_model": 248956,
+      "normalizing_flow": 251212,
+      "copula_spline": 251095
+    },
+    "seconds": {
+      "factor_model": 386.4504249095917,
+      "normalizing_flow": 372.709579706192,
+      "copula_spline": 439.5764605998993
+    }
+  },
+  "sl_dengue_cases": {
+    "levels": {
+      "Overall": {
+        "factor_model": {
+          "mean": 0.1536190788838253,
+          "std": 0.004740950315588951,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.14955857790063226,
+          "std": 0.0073044570247945365,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.14709008320949138,
+          "std": 0.004833838605612235,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -2.6432270084523877,
+        "delta_pct.copula_spline": -4.250120311729962
+      },
+      "Total": {
+        "factor_model": {
+          "mean": 0.10214341072125928,
+          "std": 0.009515223986656524,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.09385455957844484,
+          "std": 0.010737397551436646,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.089442365970702,
+          "std": 0.0074841778003170885,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -8.114915180807907,
+        "delta_pct.copula_spline": -12.43452187553963
+      },
+      "Zone": {
+        "factor_model": {
+          "mean": 0.12119915857468591,
+          "std": 0.008314369834362255,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.11783987742415467,
+          "std": 0.008435160033044672,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.11360204991639433,
+          "std": 0.006122191696834484,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -2.7717033600205845,
+        "delta_pct.copula_spline": -6.268284984511714
+      },
+      "Province": {
+        "factor_model": {
+          "mean": 0.18563862216486368,
+          "std": 0.0051644429560435325,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.18346579843992272,
+          "std": 0.006393245311916368,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.18130016216366027,
+          "std": 0.003226391365426658,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -1.1704588730524499,
+        "delta_pct.copula_spline": -2.3370460040101326
+      },
+      "District": {
+        "factor_model": {
+          "mean": 0.20549512407449244,
+          "std": 0.0011095427436885418,
+          "n_seeds": 5
+        },
+        "normalizing_flow": {
+          "mean": 0.2030740761600069,
+          "std": 0.0045968865105189575,
+          "n_seeds": 5
+        },
+        "copula_spline": {
+          "mean": 0.20401575478720888,
+          "std": 0.002820626862420562,
+          "n_seeds": 5
+        },
+        "delta_pct.normalizing_flow": -1.178153460034369,
+        "delta_pct.copula_spline": -0.719904812314326
+      }
+    },
+    "n_params": {
+      "factor_model": 111416,
+      "normalizing_flow": 113792,
+      "copula_spline": 113670
+    },
+    "seconds": {
+      "factor_model": 313.0840902328491,
+      "normalizing_flow": 429.97660183906555,
+      "copula_spline": 468.48336362838745
+    }
+  }
+}

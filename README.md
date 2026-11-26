@@ -141,6 +141,8 @@ from.
 
 ## Docs
 
+- [README_NON_GAUSSIAN_MARGINALS.md](README_NON_GAUSSIAN_MARGINALS.md) — Comprehensive benchmark results for all non-Gaussian marginals: Fixed parametric marginals (Gaussian, Skew-$t$, GMM) and Learned marginals (Gaussian, DSF, Copula Spline, Copula Flow).
+- [results_summary.md](results_summary.md) — CLOVER vs classical baselines (ARIMA, Seasonal Naive, Naive) on new hierarchical datasets.
 - [IMPLEMENTATION.md](IMPLEMENTATION.md) — conventions to follow when extending this
   codebase.
 - [docs/datasets.md](docs/datasets.md) — the eight datasets, their level slices,

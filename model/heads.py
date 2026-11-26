@@ -229,17 +229,25 @@ class NormalizingFlowSharedHead(nn.Module):
 
 
 def _spline_shape(
-    w_raw: Tensor, h_raw: Tensor, d_raw: Tensor, slope_floor: float
+    w_raw: Tensor,
+    h_raw: Tensor,
+    d_raw: Tensor,
+    slope_floor: float,
+    min_bin_width: float = 1e-3,
+    min_bin_height: float = 1e-3,
 ) -> tuple[Tensor, Tensor, Tensor]:
     """Activate a rational-quadratic spline's raw bin widths/heights/derivatives.
 
-    `softmax` keeps the bin widths and heights each a convex combination, so the
-    knot x- and y-positions they cumulative-sum into are strictly increasing;
-    `softplus(...) + slope_floor` floors every interior knot derivative above 0, the
-    same role `a_floor` plays for the normalizing-flow head's slopes.
+    `softmax` combined with a floor keeps the bin widths and heights each a strictly
+    positive convex combination (Durkan et al. 2019), so the knot x- and y-positions
+    they cumulative-sum into are strictly increasing and bin widths cannot collapse to
+    zero under float32 autodiff; `softplus(...) + slope_floor` floors every interior
+    knot derivative above 0, the same role `a_floor` plays for the normalizing-flow
+    head's slopes.
     """
-    widths = torch.softmax(w_raw, dim=-1)
-    heights = torch.softmax(h_raw, dim=-1)
+    b = w_raw.shape[-1]
+    widths = min_bin_width + (1.0 - min_bin_width * b) * torch.softmax(w_raw, dim=-1)
+    heights = min_bin_height + (1.0 - min_bin_height * b) * torch.softmax(h_raw, dim=-1)
     derivatives = F.softplus(d_raw) + slope_floor
     return widths, heights, derivatives
 

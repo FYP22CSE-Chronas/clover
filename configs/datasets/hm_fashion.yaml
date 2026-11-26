@@ -1,0 +1,33 @@
+name: hm-fashion
+
+data:
+  dir: ../datasets/hm-fashion
+  h: 7
+  input_size: 28
+  split: {strategy: last_h}
+  levels:
+    Total: [0, 1]
+    Collection: [1, 6]
+    ProductCategory: [6, 44]
+
+features:
+  static: []
+  future:
+    - {type: dayofweek_dummies}
+
+model:
+  temp_conv_channels: 20
+  dilations: [1, 2, 4]
+  cross_series_hidden: 50
+  static_encoder_dim: 10
+  future_encoder_dim: 10
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 8
+
+train:
+  learning_rate: 1.0e-3
+  max_steps: 2000
+  early_stop_patience: 5
+  val_check_steps: 50
+  val_mc_samples: 500
