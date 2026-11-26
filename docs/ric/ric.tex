@@ -235,8 +235,12 @@ to move 20 times faster under Adam, stays near its initial value, because the CR
 carries too little signal about correlation.
 
 \paragraph{Cost.} One $\Nb\times\Nb$ correlation and one symmetric eigendecomposition per
-window, at most $\Nb=200$ here (Traffic). We did not time it separately
-\todo{measure wall-clock against CLOVER}.
+window, at most $\Nb=304$ here (Tourism-large). At a fixed budget of 300 training steps
+(early stopping off, 2 threads, 3 seeds, test sampling included;
+\texttt{timing.py}), a RIC run takes $1.17\times$ CLOVER's wall-clock time on Labour
+($\Nb=32$) and $1.20\times$ on Prison ($\Nb=32$). It takes $1.88\times$ on Traffic
+($\Nb=200$) and $1.87\times$ on Tourism-large ($\Nb=304$): the overhead grows with the
+size of the bottom level.
 
 \section{Experimental setup}
 \label{sec:setup}
@@ -469,10 +473,15 @@ signal. This agrees with the earlier mean-side ties.
 
 \begin{itemize}
   \item \textbf{Baseline level.} With the paper's features our CLOVER scores $0.0077$ on
-  Labour; the paper reports $0.0074$, and PERMBU-MinT $0.0067$. The remaining $0.0003$
-  may come from the lookback (36 months here; the paper does not state it) or from
-  the estimator. The claim is therefore relative to our CLOVER, not a row in the
-  paper's table. \todo{check input size and sCRPS estimator against the paper's code}
+  Labour; the paper reports $0.0074\pm0.0005$ (95\% interval over 5 runs), and
+  PERMBU-MinT $0.0067$. Our normalisation is the paper's (each level's summed CRPS
+  over its summed absolute targets). The paper does not state its CRPS estimator for
+  evaluation or its lookback (36 months here). Our default estimator integrates
+  pinball losses on a 1\% quantile grid. Rescoring 5 seeds with the sample-based
+  estimator lowers every score by $1.1\%$ (12-seed equivalent $0.0076$) and leaves
+  RIC's relative change unchanged. The residual gap is inside the paper's interval
+  and within one of our seed standard deviations ($0.00035$). The claim is still
+  relative to our CLOVER, not a row in the paper's table.
   \item \textbf{Labour's gain depends on the baseline.} Most of RIC's Labour gain over
   the featureless configuration disappears once the paper's features are added. The
   dependence error remains, but the features remove much of the loss it accounted
@@ -504,14 +513,19 @@ signal. This agrees with the earlier mean-side ties.
 From the repository root (no core module is modified; everything lives in
 \texttt{experiments/ric\_clover/}):
 \begin{verbatim}
-python experiments/ric_clover/bench.py --datasets labour --origins 4 \
+python experiments/ric_clover/bench.py --datasets labour --origins 4 --joint \
     --variants base ric_tree ric_tree_att1 --seeds 0 1 2 3 4 5 6 7 8 9 10 11 \
-    --out experiments/ric_clover/results/labour_roll4.jsonl
-python experiments/ric_clover/stats.py experiments/ric_clover/results/labour_roll4.jsonl \
-    --variants ric_tree ric_tree_att1
+    --out experiments/ric_clover/results/joint_labour_feat_roll4.jsonl
+python experiments/ric_clover/stats.py \
+    experiments/ric_clover/results/joint_labour_feat_roll4.jsonl \
+    --variants ric_tree ric_tree_att1 --metric energy
 python experiments/ric_clover/diag_corr.py --dataset labour --variants base ric_tree
 python experiments/ric_clover/build_synthetic_ric.py
-python experiments/ric_clover/bench.py --backtest 4 --datasets labour ...
+python experiments/ric_clover/bench.py --backtest 4 --joint --datasets labour ...
+python experiments/ric_clover/gate_eval.py --backtest .../gate_joint.jsonl \
+    --test ... --select-on energy --candidates ric_tree ric_tree_att1
+python experiments/ric_clover/timing.py --steps 300   # wall-clock cost
+python experiments/ric_clover/bench.py ... --set eval.estimator=mc   # estimator check
 python experiments/ric_clover/make_report_assets.py   # tables/ and figures here
 \end{verbatim}
 \texttt{configs/datasets/labour.yaml} now carries the paper's static and calendar
