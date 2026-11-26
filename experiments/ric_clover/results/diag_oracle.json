@@ -1,0 +1,24 @@
+{
+ "0": {
+  "scrps": {
+   "Overall": 0.00793,
+   "Total": 0.00444,
+   "Geography": 0.00604,
+   "Gender/Geography": 0.00787,
+   "Status/Gender/Geography": 0.01336
+  },
+  "oracle_mean_scrps": {
+   "Overall": 0.0046,
+   "Total": 0.00385,
+   "Geography": 0.00433,
+   "Gender/Geography": 0.00472,
+   "Status/Gender/Geography": 0.00549
+  },
+  "bias_share_of_mse": {
+   "Total": 0.001,
+   "Geography": 0.271,
+   "Gender/Geography": 0.438,
+   "Status/Gender/Geography": 0.424
+  }
+ }
+}

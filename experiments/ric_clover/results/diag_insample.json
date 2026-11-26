@@ -1,0 +1,80 @@
+{
+ "0": {
+  "train to 1994": {
+   "Total": {
+    "spread_rmse": 1.09,
+    "cov80": 0.73
+   },
+   "Geography": {
+    "spread_rmse": 1.06,
+    "cov80": 0.75
+   },
+   "Gender/Geography": {
+    "spread_rmse": 1.07,
+    "cov80": 0.75
+   },
+   "Status/Gender/Geography": {
+    "spread_rmse": 0.97,
+    "cov80": 0.64
+   },
+   "bottom_error_corr": 0.151
+  },
+  "train 1995-2007": {
+   "Total": {
+    "spread_rmse": 1.81,
+    "cov80": 0.97
+   },
+   "Geography": {
+    "spread_rmse": 1.49,
+    "cov80": 0.86
+   },
+   "Gender/Geography": {
+    "spread_rmse": 1.37,
+    "cov80": 0.83
+   },
+   "Status/Gender/Geography": {
+    "spread_rmse": 0.9,
+    "cov80": 0.65
+   },
+   "bottom_error_corr": 0.047
+  },
+  "train 2008 on": {
+   "Total": {
+    "spread_rmse": 1.88,
+    "cov80": 0.98
+   },
+   "Geography": {
+    "spread_rmse": 1.52,
+    "cov80": 0.89
+   },
+   "Gender/Geography": {
+    "spread_rmse": 1.41,
+    "cov80": 0.87
+   },
+   "Status/Gender/Geography": {
+    "spread_rmse": 0.86,
+    "cov80": 0.68
+   },
+   "bottom_error_corr": 0.024
+  },
+  "test": {
+   "Total": {
+    "spread_rmse": 2.31,
+    "cov80": 1.0
+   },
+   "Geography": {
+    "spread_rmse": 1.48,
+    "cov80": 0.85
+   },
+   "Gender/Geography": {
+    "spread_rmse": 1.41,
+    "cov80": 0.83
+   },
+   "Status/Gender/Geography": {
+    "spread_rmse": 0.94,
+    "cov80": 0.68
+   },
+   "bottom_error_corr": 0.019
+  }
+ }
+}

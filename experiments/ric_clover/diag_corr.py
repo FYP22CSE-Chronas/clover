@@ -53,6 +53,7 @@ def predicted_correlations(dataset, variant, seed, origins, threads=2, overrides
     cls = pair_classes(model.S).numpy()
     test = make(split.test)
     by_h: dict[int, list[dict[int, float]]] = {}
+    factor_share: dict[int, list[float]] = {}  # common-factor share of bottom variance
     with torch.no_grad():
         for i in range(test.n_windows):
             batch = test.batch([i])
@@ -64,6 +65,9 @@ def predicted_correlations(dataset, variant, seed, origins, threads=2, overrides
                 sd = np.sqrt(np.diag(cov))
                 by_h.setdefault(h + 1, []).append(
                     class_means(cov / np.outer(sd, sd), cls)
+                )
+                factor_share.setdefault(h + 1, []).append(
+                    float(((F**2).sum(1) / np.diag(cov)).mean())
                 )
 
     # Realized: innovations over the 36 rows before each test origin, and the test
@@ -79,7 +83,8 @@ def predicted_correlations(dataset, variant, seed, origins, threads=2, overrides
         for h, ds_ in by_h.items()
     }
     real = {c: float(np.mean([d[c] for d in realized])) for c in realized[0]}
-    return {"predicted": average, "realized_innovations": real}
+    shares = {h: float(np.mean(v)) for h, v in factor_share.items()}
+    return {"predicted": average, "realized_innovations": real, "factor_share": shares}
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -106,11 +111,23 @@ def main(argv: list[str] | None = None) -> None:
             }
             for h in runs[0]["predicted"]
         }
-        out[variant] = {"predicted": pred, "realized": runs[0]["realized_innovations"]}
+        share = {
+            h: float(np.mean([r["factor_share"][h] for r in runs]))
+            for h in runs[0]["factor_share"]
+        }
+        out[variant] = {
+            "predicted": pred,
+            "realized": runs[0]["realized_innovations"],
+            "factor_share": share,
+        }
         print(variant)
         print("  realized innovations by LCA depth:", runs[0]["realized_innovations"])
         for h, v in pred.items():
-            print(f"  predicted h={h}:", {k: round(x, 3) for k, x in v.items()})
+            print(
+                f"  predicted h={h}:",
+                {k: round(x, 3) for k, x in v.items()},
+                f"factor share {share[h]:.2f}",
+            )
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:
             json.dump(out, handle, indent=1)

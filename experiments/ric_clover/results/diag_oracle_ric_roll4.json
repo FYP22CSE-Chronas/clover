@@ -1,0 +1,68 @@
+{
+ "0": {
+  "scrps": {
+   "Overall": 0.00892,
+   "Total": 0.00418,
+   "Geography": 0.00744,
+   "Gender/Geography": 0.00851,
+   "Status/Gender/Geography": 0.01557
+  },
+  "oracle_mean_scrps": {
+   "Overall": 0.00351,
+   "Total": 0.00209,
+   "Geography": 0.00282,
+   "Gender/Geography": 0.00334,
+   "Status/Gender/Geography": 0.00579
+  },
+  "bias_share_of_mse": {
+   "Total": 0.568,
+   "Geography": 0.64,
+   "Gender/Geography": 0.609,
+   "Status/Gender/Geography": 0.603
+  }
+ },
+ "1": {
+  "scrps": {
+   "Overall": 0.01043,
+   "Total": 0.00567,
+   "Geography": 0.00944,
+   "Gender/Geography": 0.01038,
+   "Status/Gender/Geography": 0.0162
+  },
+  "oracle_mean_scrps": {
+   "Overall": 0.00381,
+   "Total": 0.00229,
+   "Geography": 0.00306,
+   "Gender/Geography": 0.00364,
+   "Status/Gender/Geography": 0.00623
+  },
+  "bias_share_of_mse": {
+   "Total": 0.596,
+   "Geography": 0.709,
+   "Gender/Geography": 0.682,
+   "Status/Gender/Geography": 0.585
+  }
+ },
+ "2": {
+  "scrps": {
+   "Overall": 0.00919,
+   "Total": 0.00437,
+   "Geography": 0.00779,
+   "Gender/Geography": 0.00887,
+   "Status/Gender/Geography": 0.01571
+  },
+  "oracle_mean_scrps": {
+   "Overall": 0.00368,
+   "Total": 0.00218,
+   "Geography": 0.00296,
+   "Gender/Geography": 0.00351,
+   "Status/Gender/Geography": 0.00606
+  },
+  "bias_share_of_mse": {
+   "Total": 0.638,
+   "Geography": 0.684,
+   "Gender/Geography": 0.641,
+   "Status/Gender/Geography": 0.589
+  }
+ }
+}

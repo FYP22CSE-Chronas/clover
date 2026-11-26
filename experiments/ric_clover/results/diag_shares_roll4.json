@@ -1,0 +1,21 @@
+{
+ "bias_share": {
+  "parent_error": 0.45,
+  "within_sibling_split": 0.571
+ },
+ "model": {
+  "overall": 0.00951,
+  "bottom": 0.01583,
+  "bottom_change_pct": 0.0
+ },
+ "last_share": {
+  "overall": 0.00979,
+  "bottom": 0.01695,
+  "bottom_change_pct": 7.06
+ },
+ "window_share": {
+  "overall": 0.00975,
+  "bottom": 0.01677,
+  "bottom_change_pct": 5.92
+ }
+}

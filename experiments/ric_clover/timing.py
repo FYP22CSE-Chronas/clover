@@ -53,10 +53,18 @@ def main(argv: list[str] | None = None) -> None:
                 start = time.perf_counter()
                 result = runner.run(config, seed=seed, verbose=False)
                 seconds = time.perf_counter() - start
-                print(json.dumps({
-                    "dataset": dataset, "variant": variant, "seed": seed,
-                    "steps_run": result.history.steps_run, "seconds": round(seconds, 2),
-                }), flush=True)
+                print(
+                    json.dumps(
+                        {
+                            "dataset": dataset,
+                            "variant": variant,
+                            "seed": seed,
+                            "steps_run": result.history.steps_run,
+                            "seconds": round(seconds, 2),
+                        }
+                    ),
+                    flush=True,
+                )
 
 
 if __name__ == "__main__":

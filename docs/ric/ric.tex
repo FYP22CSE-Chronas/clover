@@ -141,14 +141,16 @@ to predict too much positive correlation between bottom series.
 
 \paragraph{Predicted versus realized dependence.} Figure~\ref{fig:correlation} groups
 bottom pairs by the depth of their lowest common ancestor in $\Smat$. CLOVER predicts
-$+0.21$ to $+0.27$ for every class at $h=1$, rising to about $+0.4$ at $h=12$ (the
-common-factor share of predictive variance grows from $0.50$ to $0.70$). The realized
+$+0.21$ to $+0.28$ for every class at $h=1$, rising to about $+0.4$ at $h=12$ (the
+common-factor share of bottom-level predictive variance grows from $0.40$ to $0.57$;
+\texttt{diag\_corr.py}, three seeds). The realized
 innovations disagree in sign for siblings ($-0.45$): employment shifts between
 full-time and part-time while the sum is steady, which is the cointegrating relation
 in this hierarchy. Across regions they are only weakly positive ($+0.09$). The
-sibling correlation has also strengthened over time ($-0.13$ in 1979--95, $-0.22$ in
-1995--2008, $-0.33$ in 2008--16, $-0.36$ in the 36 months before the test), while the
-common national component has faded ($+0.17$, $+0.17$, $+0.10$, $+0.10$).
+sibling correlation has also strengthened over time ($-0.21$ in 1978--94, $-0.32$ in
+1995--2007, $-0.44$ in 2008--15, $-0.47$ in the 36 months before the test), while the
+cross-state component has faded ($+0.16$, $+0.17$, $+0.10$, $+0.09$;
+\texttt{diagnose.py eras}).
 
 \paragraph{Mechanism.} Each series' loadings are a shared function of its own z-scored
 level window (and, with features, a fixed identity code). Trending levels look alike
@@ -159,10 +161,11 @@ series. Identity features make that representable, but the CRPS gradient does no
 find it. This is the spurious-regression effect
 \citep{granger1974spurious} inside a neural head. Levels of integrated series appear
 correlated whatever their innovations do. The decay over time compounds it.
-In-sample, the Total is calibrated in 1981--95 (spread/RMSE $1.00$, bottom
-forecast-error correlation $0.15$), and the ratio drifts to $1.44$ in 2008--16
-($0.04$) and to $2.31$ on the test ($0.02$). The model's dependence is fixed while the
-data's is not.
+On in-sample windows before 1995 the Total is close to calibrated (spread/RMSE $1.09$,
+bottom forecast-error correlation $0.15$). The ratio rises to $1.81$ in 1995--2007
+($0.05$), $1.88$ from 2008 ($0.02$) and $2.31$ on the test ($0.02$; featureless model,
+\texttt{diagnose.py insample}). The model's dependence is fixed while the data's is
+not.
 
 This also explains why mean-side error correction tied: it acts on the part of the
 loss that is not broken.
@@ -227,8 +230,9 @@ $s_{i\eta}$. The correlation is computed from data with no learned parameters.
 
 \paragraph{Optional attenuation.} A forecast error contains the network's own mean
 error as well as the innovations, and that error is largely idiosyncratic. Forecast
-errors are therefore less correlated than innovations: on Labour, $0.033$ against $0.079$
-across regions and $-0.38$ against $-0.59$ for siblings. Scaling the unit loadings by
+errors are therefore less correlated than innovations: on Labour under RIC, $0.033$
+against $0.093$ across states and $-0.38$ against $-0.45$ for siblings (featureless
+configuration, rolling origins, three seeds; \texttt{diagnose.py errors}). Scaling the unit loadings by
 $\sqrt\rho$ maps $\mathbf{R}$ to $\rho\mathbf{R}+(1-\rho)I$ exactly. We report
 $\rho=0.8$ as a fixed constant. A learned per-horizon $\rho_\eta$, even reparameterised
 to move 20 times faster under Adam, stays near its initial value, because the CRPS
@@ -253,7 +257,7 @@ months). Each has its CLOVER configuration unchanged. The \emph{synthetic} hiera
 total is a log random walk with drift, driven by a national shock whose loading fades
 from 1 to $0.2$. It splits into full-time and part-time through a share whose logit is
 an AR(1) with $\phi=0.97$. Realized sibling innovation correlation runs from $-0.42$ to
-$-0.65$ and other pairs from $0.16$ to $0.03$. The model and training settings copy
+$-0.68$ and cross-region pairs from $0.16$ to $0.00$. The model and training settings copy
 Labour's, so the synthetic isolates the dependence mechanism under the architecture
 CLOVER actually uses there.
 
@@ -459,7 +463,8 @@ full pre-origin history helped: $+5.1\%$ with both combined, 5 seeds. That hiera
 is quarterly and short (36 rows), and its dependence is not estimable this way.
 
 \paragraph{The remaining mean error is not cheaply forecastable.} On Labour (paper
-configuration, RIC, three seeds) about $60\%$ of the bottom level's per-origin bias is
+configuration, RIC with $\rho=0.8$, three seeds) $57$--$61\%$ of the bottom level's
+per-origin bias is
 a mis-split within full-time/part-time pairs, not an error in the pair's sum. Keeping
 each pair's predicted sum and re-splitting it by the last observed share, or by the
 window-average share, leaves every aggregate unchanged by construction. It makes the
@@ -489,7 +494,8 @@ signal. This agrees with the earlier mean-side ties.
   large score change.
   \item \textbf{Remaining Labour gap.} The Total stays wide (spread/RMSE $1.28$ rolling,
   $1.95$ on the single window), and no attenuation removes it without losing elsewhere.
-  Below the Total, about $55\%$ of squared error is per-origin bias in the mean, which
+  Between $59\%$ and $68\%$ of squared error at every level is per-origin bias in the
+  mean (rolling origins, RIC with $\rho=0.8$, three seeds), which
   no dependence model can address. Simple share-based re-anchoring does not recover it
   (Section~\ref{sec:negative}).
   \item \textbf{Short series.} Prison and Tourism-small give RIC 7 differences per window.
@@ -532,9 +538,13 @@ python experiments/ric_clover/make_report_assets.py   # tables/ and figures here
 features, so the commands above run the paper configuration. To reproduce the
 featureless Labour rows, add
 \verb|--set "features.static=[]" --set "features.future=[]"|.
-Calibration-by-era and oracle-debiasing numbers in Section~\ref{sec:diagnosis} come from
-one-off diagnostics run during the investigation and are not yet scripted
-\todo{script them before submission}.
+The diagnosis numbers come from \texttt{diagnose.py} (results in
+\texttt{results/diag\_*.json}): \texttt{eras} for the realized correlations by period,
+\texttt{oracle} for the oracle-mean sCRPS and the bias share of squared error,
+\texttt{insample} for calibration by period, \texttt{errors} for forecast-error against
+innovation correlation, and \texttt{shares} for the within-pair bias split and the
+share re-anchoring. Section~\ref{sec:diagnosis} uses \texttt{--features none}, the
+mean-side checks the paper configuration with \texttt{--variant ric\_tree\_att1}.
 
 \section{Conclusion}
 
