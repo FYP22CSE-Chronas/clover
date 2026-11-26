@@ -32,3 +32,12 @@ env/
 
 # Logs from ad-hoc runs
 *.log
+
+# LaTeX build files
+*.aux
+*.bbl
+*.blg
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls

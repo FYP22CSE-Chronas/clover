@@ -15,6 +15,10 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 
+% Lets paragraphs with long unbreakable words (paths, hyphenated terms) stretch
+% instead of overrunning the margin.
+\setlength{\emergencystretch}{2em}
+
 \newcommand{\todo}[1]{\textcolor{red}{[#1]}}
 \newcommand{\Nb}{N_{b}}
 \newcommand{\Na}{N_{a}}
@@ -317,8 +321,10 @@ $-0.45$.
   \centering
   \includegraphics[width=\linewidth]{fig_calibration.pdf}
   \caption{Predictive spread over RMSE by aggregation level, mean over 12 seeds (1 is
-  calibrated). CLOVER is too wide at every aggregate and too narrow at the bottom on
-  the synthetic data. RIC moves every level toward 1; on Labour the Total stays wide
+  calibrated). Labour uses the featureless configuration, as in
+  Figure~\ref{fig:correlation}; Table~\ref{tab:levels} gives the paper configuration.
+  CLOVER is too wide at every aggregate and too narrow at the bottom on the synthetic
+  data. RIC moves every level toward 1; on Labour the Total stays wide
   (Section~\ref{sec:limitations}).}
   \label{fig:calibration}
 \end{figure}
@@ -493,8 +499,9 @@ signal. This agrees with the earlier mean-side ties.
   dependence error remains, but the features remove much of the loss it accounted
   for. The robust Labour claim is the corrected dependence and calibration, not a
   large score change.
-  \item \textbf{Remaining Labour gap.} The Total stays wide (spread/RMSE $1.28$ rolling,
-  $1.95$ on the single window), and no attenuation removes it without losing elsewhere.
+  \item \textbf{Remaining Labour gap.} The Total stays wide (spread/RMSE $1.21$ rolling,
+  $2.27$ on the single window, paper configuration with $\rho=0.8$;
+  Table~\ref{tab:levels}), and no attenuation removes it without losing elsewhere.
   Between $59\%$ and $68\%$ of squared error at every level is per-origin bias in the
   mean (rolling origins, RIC with $\rho=0.8$, three seeds), which
   no dependence model can address. Simple share-based re-anchoring does not recover it
@@ -517,8 +524,8 @@ signal. This agrees with the earlier mean-side ties.
 \section{Reproduction}
 \label{sec:repro}
 
-From the repository root (no core module is modified; everything lives in
-\texttt{experiments/ric\_clover/}):
+Run these from the repository root. No core module is modified; everything lives in
+the directory \texttt{experiments/ric\_clover/}.
 \begin{verbatim}
 python experiments/ric_clover/bench.py --datasets labour --origins 4 --joint \
     --variants base ric_tree ric_tree_att1 --seeds 0 1 2 3 4 5 6 7 8 9 10 11 \
@@ -526,13 +533,14 @@ python experiments/ric_clover/bench.py --datasets labour --origins 4 --joint \
 python experiments/ric_clover/stats.py \
     experiments/ric_clover/results/joint_labour_feat_roll4.jsonl \
     --variants ric_tree ric_tree_att1 --metric energy
-python experiments/ric_clover/diag_corr.py --dataset labour --variants base ric_tree
+python experiments/ric_clover/diag_corr.py --dataset labour \
+    --variants base ric_tree
 python experiments/ric_clover/build_synthetic_ric.py
 python experiments/ric_clover/bench.py --backtest 4 --joint --datasets labour ...
 python experiments/ric_clover/gate_eval.py --backtest .../gate_joint.jsonl \
     --test ... --select-on energy --candidates ric_tree ric_tree_att1
 python experiments/ric_clover/timing.py --steps 300   # wall-clock cost
-python experiments/ric_clover/bench.py ... --set eval.estimator=mc   # estimator check
+python experiments/ric_clover/bench.py ... --set eval.estimator=mc  # estimator
 python experiments/ric_clover/make_report_assets.py   # tables/ and figures here
 \end{verbatim}
 \texttt{configs/datasets/labour.yaml} now carries the paper's static and calendar
