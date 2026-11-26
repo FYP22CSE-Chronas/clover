@@ -12,7 +12,7 @@ import numpy as np
 # every metric, against the baseline on the same seeds. The backtest never touches the
 # test horizon, so the gated rows are honest results.
 
-DATASETS = ["labour", "prison", "tourism_small", "wiki2", "traffic"]
+DATASETS = ["labour", "prison", "tourism_small", "wiki2", "traffic", "tourism_large"]
 METRICS = ["scrps", "energy", "variogram"]
 
 

@@ -85,6 +85,8 @@ def main_table() -> str:
         ("Labour, no features", "4 rolling origins", "labour_roll4.jsonl", "labour"),
         ("Prison", "last 8 quarters", "others_lasth.jsonl", "prison"),
         ("Tourism-S", "last 4 quarters", "others_lasth.jsonl", "tourism_small"),
+        ("Tourism-L", "last 12 months", "joint_tourism_large_lasth.jsonl", "tourism_large"),
+        ("Tourism-L", "4 rolling origins", "joint_tourism_large_roll4.jsonl", "tourism_large"),
         ("Wiki2", "last 7 days", "others_lasth.jsonl", "wiki2"),
         ("Traffic", "last day", "others_lasth.jsonl", "traffic"),
         ("Traffic", "7 rolling days", "traffic_roll7.jsonl", "traffic"),
@@ -398,6 +400,8 @@ def joint_table() -> str:
         ("Labour", "4 rolling origins", "joint_labour_feat_roll4.jsonl", "labour"),
         ("Prison", "last 8 quarters", "joint_others_lasth.jsonl", "prison"),
         ("Tourism-S", "last 4 quarters", "joint_others_lasth.jsonl", "tourism_small"),
+        ("Tourism-L", "last 12 months", "joint_tourism_large_lasth.jsonl", "tourism_large"),
+        ("Tourism-L", "4 rolling origins", "joint_tourism_large_roll4.jsonl", "tourism_large"),
         ("Wiki2", "last 7 days", "joint_others_lasth.jsonl", "wiki2"),
         ("Traffic", "7 rolling days", "joint_traffic_roll7.jsonl", "traffic"),
         ("Synthetic", "4 rolling origins", "joint_synthetic.jsonl", "synthetic_ric"),
@@ -460,7 +464,8 @@ def joint_table() -> str:
 def gate_table() -> str:
     """Pre-test backtest gate: what each selection score picks, and the real-test result.
 
-    Pool: CLOVER, RIC, RIC with rho 0.8. Labour's test is the rolling protocol.
+    Pool: CLOVER, RIC, RIC with rho 0.8. Labour's and Tourism-L's tests are the rolling
+    protocol.
     """
     import sys
 
@@ -476,6 +481,7 @@ def gate_table() -> str:
                 "joint_labour_feat_roll4.jsonl",
                 "joint_others_lasth.jsonl",
                 "joint_traffic_roll7.jsonl",
+                "joint_tourism_large_roll4.jsonl",
             )
         ]
     )
@@ -483,6 +489,7 @@ def gate_table() -> str:
         "labour": "Labour",
         "prison": "Prison",
         "tourism_small": "Tourism-S",
+        "tourism_large": "Tourism-L",
         "wiki2": "Wiki2",
         "traffic": "Traffic",
     }

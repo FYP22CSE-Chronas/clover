@@ -103,7 +103,7 @@ sCRPS. This report explains why and gives a variant that does.
   from first differences, shrinks it toward a target derived from $\Smat$ alone, and
   keeps the network's marginals and CLOVER's sampling, coherence and loss unchanged.
   \item Evidence (Sections~\ref{sec:results}--\ref{sec:ablations}): 12-seed paired tests
-  with Holm correction across five public hierarchies, a synthetic hierarchy with known
+  with Holm correction across six public hierarchies, a synthetic hierarchy with known
   dependence, and ablations that isolate the cause.
   \item A corrected Labour baseline. The repository's Labour configuration lacked the
   paper's static and calendar features; restoring them closes most of the gap to the
@@ -242,8 +242,9 @@ window, at most $\Nb=200$ here (Traffic). We did not time it separately
 \label{sec:setup}
 
 \paragraph{Datasets.} The five public single hierarchies of the CLOVER benchmark used
-throughout this project: Labour, Prison, Tourism-small, Wiki2, Traffic. Each has its
-CLOVER configuration unchanged. The \emph{synthetic} hierarchy mirrors Labour's shape
+throughout this project (Labour, Prison, Tourism-small, Wiki2, Traffic), plus the grouped
+Tourism-large hierarchy as a breadth check (555 monthly series, 304 at the bottom, 228
+months). Each has its CLOVER configuration unchanged. The \emph{synthetic} hierarchy mirrors Labour's shape
 (Total, 4 regions, 8 region--gender groups, 16 bottom series; 480 months). Each group
 total is a log random walk with drift, driven by a national shock whose loading fades
 from 1 to $0.2$. It splits into full-time and part-time through a share whose logit is
@@ -253,8 +254,8 @@ Labour's, so the synthetic isolates the dependence mechanism under the architect
 CLOVER actually uses there.
 
 \paragraph{Protocols.} The paper's single last-horizon test, plus rolling-origin tests
-where a series is long enough: Labour, four non-overlapping 12-month origins; Traffic,
-seven daily origins; Synthetic, four 12-month origins. Prison and Tourism-small are
+where a series is long enough: Labour and Tourism-large, four non-overlapping 12-month
+origins; Traffic, seven daily origins; Synthetic, four 12-month origins. Prison and Tourism-small are
 too short for rolling tests.
 
 \paragraph{Seeds and testing.} Seeds 0--11 for every configuration, the same seeds for
@@ -262,7 +263,7 @@ CLOVER and RIC (paired), 4 workers $\times$ 2 torch threads. The thread count is
 because CLOVER results change with it. Our CLOVER runs reproduce the project's stored
 baseline file exactly, seed for seed. Each comparison uses a two-sided Wilcoxon
 signed-rank test \citep{wilcoxon1945individual} on the 12 paired overall sCRPS values,
-with Holm correction \citep{holm1979simple} across all 16 comparisons in
+with Holm correction \citep{holm1979simple} across all 24 comparisons in
 Table~\ref{tab:main}.
 
 \section{Results}
@@ -275,12 +276,12 @@ Table~\ref{tab:main}.
   \caption{Overall sCRPS of CLOVER and relative change $\Delta$ (mean over 12 paired
   seeds) for RIC (tree target, analytic shrinkage) and RIC with attenuation
   $\rho=0.8$. ``wins'' counts seeds on which the variant is better. $p_\text{Holm}$:
-  Wilcoxon signed-rank, Holm-adjusted over the 16 comparisons; bold where
+  Wilcoxon signed-rank, Holm-adjusted over the 24 comparisons; bold where
   $p_\text{Holm}<0.05$.}
   \label{tab:main}
 \end{table}
 
-Table~\ref{tab:main} gives the headline. Holm correction runs over all 20
+Table~\ref{tab:main} gives the headline. Holm correction runs over all 24
 comparisons. Two results are significant for plain RIC. On Prison it gains $-8.6\%$,
 better on all 12 seeds; Prison is a short, integrated hierarchy whose configuration
 already carries the paper's features. On the synthetic hierarchy, built to have
@@ -292,7 +293,7 @@ significant. Against the featureless configuration, the gains are larger: $-3.6\
 $-1.7\%$, and with attenuation $-2.0\%$ on all 12 seeds, significant after correction.
 The features improve CLOVER's mean forecasts. They leave its dependence wrong, but
 they shrink the share of the loss that dependence controls. On the other
-three datasets no change is significant. For attenuated RIC, Traffic's single-day
+four datasets no change is significant. For attenuated RIC, Traffic's single-day
 test suggests a loss ($+4.9\%$ mean, $+0.8\%$ median), but the seven-day rolling test
 reverses its sign ($-2.7\%$), so that single-day figure should not be read as a loss.
 Plain RIC is neutral on the seven-day test ($+0.5\%$, median $-2.3\%$).
@@ -349,7 +350,7 @@ scores reproduced every stored sCRPS exactly.
   \input{tables/joint.tex}
   \caption{Relative change in the energy and variogram scores of the joint bottom-level
   forecast distribution against CLOVER (paper configuration), mean over 12 paired
-  seeds. Bold: Wilcoxon $p<0.05$ after Holm correction over the 28 comparisons in this
+  seeds. Bold: Wilcoxon $p<0.05$ after Holm correction over the 36 comparisons in this
   table. Lower is better, so a bold positive entry is a significant loss.}
   \label{tab:joint}
 \end{table}
@@ -358,7 +359,7 @@ The synthetic hierarchy improves on every seed under both scores. That is the cl
 evidence that RIC's dependence is better where the truth is known. Prison's energy score
 improves on every seed ($-5.2\%$). On Labour the energy score improves on 11 of 12 seeds
 under rolling origins ($-1.1\%$, unadjusted $p=0.007$), where sCRPS saw nothing. That
-does not survive correction over 28 tests. The variogram score, which also penalises
+does not survive correction over 36 tests. The variogram score, which also penalises
 errors in the differences between series' means, does not move on Labour, whose loss
 is dominated by mean error.
 
@@ -368,7 +369,9 @@ Traffic is daily occupancy with weekly seasonality, not an integrated hierarchy,
 first differences estimate a $200\times200$ correlation poorly. CLOVER's network, with
 its cross-series mixer, learns a better dependence there. Wiki2 is similar but weaker:
 plain RIC worsens both scores by about $3.5\%$, while the attenuated version is
-neutral. These are costs that the sCRPS-only view in Table~\ref{tab:main} hid.
+neutral. These are costs that the sCRPS-only view in Table~\ref{tab:main} hid. Tourism-large,
+the largest hierarchy here, moves by at most $1.4\%$ in any score under either
+protocol, never significantly.
 
 \section{Ablations}
 \label{sec:ablations}
@@ -410,8 +413,8 @@ Table~\ref{tab:ablation} isolates the cause.
 
 Since RIC helps integrated hierarchies and hurts Traffic, a practitioner needs a rule
 for when to use it. We use a pre-test backtest. It drops the final horizon (the real
-test) and scores rolling pseudo-test origins inside the remaining data: 4 for Labour
-and Wiki2, 7 for Traffic, 2 for Tourism-S, and 1 for Prison, the most its 40 rows
+test) and scores rolling pseudo-test origins inside the remaining data: 4 for Labour,
+Wiki2 and Tourism-L, 7 for Traffic, 2 for Tourism-S, and 1 for Prison, the most its 40 rows
 allow. It runs 5 seeds of CLOVER, RIC and RIC with $\rho=0.8$, and picks whichever
 has the lowest backtest score. Table~\ref{tab:gate} compares selecting on sCRPS with
 selecting on the energy score.
@@ -422,8 +425,8 @@ selecting on the energy score.
   \input{tables/gate.tex}
   \caption{Backtest-gated selection. ``pick'' is the configuration with the lowest mean
   backtest score; its real-test change against CLOVER is the mean over 12 paired
-  seeds (wins in parentheses). Labour is scored on four rolling origins (paper
-  configuration), Traffic on seven rolling days.}
+  seeds (wins in parentheses). Labour (paper configuration) and Tourism-L are
+  scored on four rolling origins, Traffic on seven rolling days.}
   \label{tab:gate}
 \end{table}
 
@@ -431,11 +434,11 @@ Selecting on sCRPS fails in both directions. It rejects RIC on Labour. It accept
 on Traffic, at a $+5.6\%$ energy-score loss. On Prison it was a coin-flip (backtest
 margin $0.07\%$). Selecting on the energy score makes the call that the 12-seed test
 results support on every dataset. It keeps RIC on Labour and Prison (backtest
-$-1.0\%$ and $-6.6\%$) and rejects it on Wiki2 and Traffic. On Tourism-S it picks
-attenuated RIC on a $-0.7\%$ margin; the test results there are neutral in every
-score. Even from a single pseudo-origin, the joint score separates Prison clearly
+$-1.0\%$ and $-6.6\%$) and rejects it on Wiki2 and Traffic. On Tourism-S and Tourism-L it
+picks attenuated RIC on margins of $-0.7\%$ and $-0.1\%$; the test results there are
+neutral in every score. Even from a single pseudo-origin, the joint score separates Prison clearly
 where sCRPS could not. The energy-gated procedure leaves no dataset significantly
-worse on any score. It averages $-1.4\%$ in both sCRPS and energy score over the five
+worse on any score. It averages $-1.2\%$ in sCRPS and $-1.3\%$ in energy score over the six
 datasets, and $-8.6\%$ / $-5.2\%$ on Prison. This is the deployable form of the
 method: RIC behind a joint-score backtest gate.
 
@@ -490,9 +493,9 @@ signal. This agrees with the earlier mean-side ties.
   hierarchy (Labour, Prison, the synthetic data). On Traffic it significantly worsens
   the joint distribution (Section~\ref{sec:joint}), and on Wiki2 plain RIC does too, so
   it must not be applied blindly. A backtest gate on the energy score handles this on
-  all five datasets (Section~\ref{sec:gate}). A gate on sCRPS does not, and neither
+  all six datasets (Section~\ref{sec:gate}). A gate on sCRPS does not, and neither
   does a unit-root test: ADF flags $85\%$ of Traffic's series, about the same share as
-  Prison's. The gate is validated on five datasets only, and with 5 backtest seeds.
+  Prison's. The gate is validated on six datasets only, and with 5 backtest seeds.
 \end{itemize}
 
 \section{Reproduction}
@@ -531,7 +534,7 @@ fixes the dependence where the truth is known. It improves Prison significantly 
 Labour's paper test window on 11 of 12 seeds, and corrects Labour's aggregate
 calibration. On a daily seasonal hierarchy whose learned dependence is already good
 (Traffic) it is harmful in the joint scores. A pre-test backtest that selects on the
-energy score separates the two cases on all five datasets, which makes RIC safe to
+energy score separates the two cases on all six datasets, which makes RIC safe to
 deploy. What remains of Labour's gap is in the mean.
 
 \bibliographystyle{plainnat}
