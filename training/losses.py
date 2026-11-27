@@ -64,15 +64,13 @@ def energy_score(
     b, n = y_true.shape[0], samples.shape[-1]
     y_flat = y_true.reshape(b, -1)
     s_flat = samples.reshape(b, -1, n)
-    term1 = (
-        torch.linalg.vector_norm(s_flat - y_flat.unsqueeze(-1), ord=2, dim=-2)
-        .pow(beta)
-        .mean(dim=-1)
-    )
-    diffs = s_flat.unsqueeze(-1) - s_flat.unsqueeze(-2)
-    term2 = torch.linalg.vector_norm(diffs, ord=2, dim=-3).pow(beta).sum(dim=(-1, -2)) / (
-        n * (n - 1)
-    )
+    diffs_y = torch.linalg.vector_norm(s_flat - y_flat.unsqueeze(-1), ord=2, dim=-2)
+    term1 = diffs_y.pow(beta).mean(dim=-1)
+    st = s_flat.transpose(1, 2)  # [B, N, H*I]
+    dmat = torch.cdist(st, st, p=2.0)  # [B, N, N]
+    if beta != 1.0:
+        dmat = dmat.pow(beta)
+    term2 = dmat.sum(dim=(-1, -2)) / (n * (n - 1))
     return _reduce(term1 - 0.5 * term2, reduction)
 
 

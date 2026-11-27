@@ -124,6 +124,11 @@ class ECConfig:
     beta_normalize: str = "none"
     alpha_init_std: float = 1e-2
     beta_init: BetaInitConfig = field(default_factory=BetaInitConfig)
+    operator: str = "alpha_beta"
+    state_norm: str = "window"
+    pi_init_std: float = 2e-2
+    pi_frozen: bool = False
+    factor_refine: bool = False
 
     def __post_init__(self) -> None:
         if self.rank < 1:
@@ -134,6 +139,21 @@ class ECConfig:
             )
         if self.alpha_init_std < 0:
             raise ValueError(f"ec.alpha_init_std must be >= 0, got {self.alpha_init_std}")
+        if self.operator not in ("alpha_beta", "pi"):
+            raise ValueError(
+                f"ec.operator must be 'alpha_beta' or 'pi', got {self.operator!r}"
+            )
+        if self.state_norm not in ("window", "train_ref"):
+            raise ValueError(
+                f"ec.state_norm must be 'window' or 'train_ref', got {self.state_norm!r}"
+            )
+        if self.pi_init_std < 0:
+            raise ValueError(f"ec.pi_init_std must be >= 0, got {self.pi_init_std}")
+        if self.operator == "pi" and self.pi_init_std == 0:
+            raise ValueError(
+                "ec.pi_init_std must be > 0 when ec.operator == 'pi' "
+                "(L=0 is a dead-gradient trap since du/dL = 0)"
+            )
         if self.fusion not in ("concat", "gated_residual"):
             raise ValueError(
                 f"ec.fusion must be 'concat' or 'gated_residual', got {self.fusion!r}"
@@ -168,6 +188,23 @@ class ECConfig:
         if "beta_init" in raw:
             raw["beta_init"] = BetaInitConfig.from_dict(raw["beta_init"])
         return _strict(cls, raw, "ec")
+
+    @classmethod
+    def pi_hs_vp(cls, rank: int = 2) -> ECConfig:
+        """Unified Pi = -L L^T + Hierarchy-Structured VP Factor Mixer preset."""
+        return cls(
+            enabled=True,
+            operator="pi",
+            state_norm="train_ref",
+            rank=rank,
+            encoder="dilated_conv",
+            encoder_channels=8,
+            pi_init_std=2e-2,
+            pi_frozen=False,
+            fusion="gated_residual",
+            gate_init=-4.595,
+            factor_refine=True,
+        )
 
 
 def load_ec_config(path: str | None) -> ECConfig:

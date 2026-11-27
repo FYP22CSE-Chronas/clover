@@ -1,0 +1,37 @@
+name: aus_retail
+
+data:
+  dir: data/raw/aus-retail
+  h: 12
+  input_size: 36
+  split: {strategy: last_h}
+  levels:
+    Total: [0, 1]
+    State: [1, 7]
+    Industry/State: [7, 43]
+
+features:
+  static: []
+  future: []
+
+model:
+  temp_conv_channels: 20
+  dilations: [1, 2, 3, 6, 12]
+  cross_series_hidden: 0
+  static_encoder_dim: 10
+  future_encoder_dim: 20
+  horizon_specific_dim: 5
+  horizon_agnostic_dim: 10
+  n_factors: 20
+
+train:
+  learning_rate: 1.0e-3
+  max_steps: 2000
+  early_stop_patience: 4
+  val_check_steps: 50
+  val_mc_samples: 500
+
+eval:
+  estimator: quantile
+  quantile_step: 0.01
+  num_samples: 100

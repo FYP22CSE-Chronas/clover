@@ -6,12 +6,17 @@ import torch.nn as nn
 from torch import Tensor
 
 from config import ModelConfig
+from contracts import ScaleStats
 from experiments.ec_clover.config import ECConfig
 from model.encoders import ENCODERS
+from registry import Registry
 
 EPS = 1e-6
 
+EC_BRANCHES: Registry[nn.Module] = Registry("ec_branch")
 
+
+@EC_BRANCHES.register("alpha_beta")
 class ErrorCorrectionBranch(nn.Module):
     """Historical error-correction representation over bottom-level history.
 
@@ -93,8 +98,9 @@ class ErrorCorrectionBranch(nn.Module):
         )
         self.out_channels = self.encoder.out_channels
 
-    def forward(self, y: Tensor) -> Tensor:
+    def forward(self, y: Tensor, scale: ScaleStats | None = None) -> Tensor:
         """[B, L, Nb] insample history -> [B, Nb, C] EC representation."""
+        del scale
         beta = self._beta()
         e = torch.einsum("bln,nr->blr", y, beta)  # [B, L, r] equilibrium errors
         seq = e if self.ec_input == "e" else torch.einsum("blr,nr->bln", e, self.alpha)

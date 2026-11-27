@@ -15,6 +15,7 @@ class WindowBatch:
     futr_exog: Tensor | None = None  # [B, F, L+H, Nb]
     hist_exog: Tensor | None = None  # [B, X, L, Nb]
     stat_exog: Tensor | None = None  # [Nb, S] or [B, Nb, S]
+    scale: ScaleStats | None = None  # [B, 1, Nb] loc/scale for raw-level recovery
 
 
 @dataclass(frozen=True)

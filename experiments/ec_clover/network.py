@@ -7,8 +7,10 @@ from torch import Tensor
 
 from config import ModelConfig, ModelDims
 from contracts import FactorParams, GMMParams, SkewTParams, WindowBatch
+import experiments.ec_clover.pi_branch  # noqa: F401 -- registers 'pi'
 from experiments.ec_clover.config import ECConfig
-from experiments.ec_clover.ec_branch import ErrorCorrectionBranch
+from experiments.ec_clover.ec_branch import EC_BRANCHES
+from experiments.ec_clover.factor_refiner import CrossSeriesFactorRefiner
 from experiments.ec_clover.fusion import FUSIONS
 from model.network import CLOVER
 
@@ -42,7 +44,8 @@ class CloverWithErrorCorrection(CLOVER):
         super().__init__(config, dims, S)
         self.ec_config = ec_config or ECConfig()
         if self.ec_config.enabled:
-            self.ec_branch: ErrorCorrectionBranch | None = ErrorCorrectionBranch(
+            self.ec_branch: nn.Module | None = EC_BRANCHES.create(
+                self.ec_config.operator,
                 n_bottom=self.n_bottom,
                 input_size=dims.input_size,
                 ec_config=self.ec_config,
@@ -58,9 +61,18 @@ class CloverWithErrorCorrection(CLOVER):
                 n_layers=self.ec_config.fusion_layers,
                 gate_init=self.ec_config.gate_init,
             )
+            self.factor_refiner: CrossSeriesFactorRefiner | None = (
+                CrossSeriesFactorRefiner(
+                    S=self.S,
+                    n_bottom=self.n_bottom,
+                )
+                if self.ec_config.factor_refine
+                else None
+            )
         else:
             self.ec_branch = None
             self.fusion = None
+            self.factor_refiner = None
 
     def forward(self, batch: WindowBatch) -> FactorParams | SkewTParams | GMMParams:
         if self.ec_branch is None or self.fusion is None:
@@ -74,7 +86,7 @@ class CloverWithErrorCorrection(CLOVER):
 
         y_hier = torch.einsum("ij,bjl->bil", self.S, batch.insample_y.permute(0, 2, 1))
         h_hist = self.mixer(self.encoder(y_hier, self._hist_channels(batch, b)))
-        h_hist = self.fusion(h_hist, self.ec_branch(batch.insample_y))
+        h_hist = self.fusion(h_hist, self.ec_branch(batch.insample_y, batch.scale))
 
         parts = [h_hist]
         if self.static_mlp is not None and batch.stat_exog is not None:
@@ -87,4 +99,7 @@ class CloverWithErrorCorrection(CLOVER):
             parts.append(self.future_mlp(futr_h.reshape(b, n_bottom, -1)))
 
         context = torch.cat(parts, dim=-1)
-        return self.head(self.decoder(context, futr_h))
+        params = self.head(self.decoder(context, futr_h))
+        if self.factor_refiner is not None and isinstance(params, FactorParams):
+            params = self.factor_refiner(params, batch.insample_y)
+        return params

@@ -1,0 +1,30 @@
+,"['Employed full-time', 'Females', 'Region0']","['Employed part-time', 'Females', 'Region0']","['Employed full-time', 'Males', 'Region0']","['Employed part-time', 'Males', 'Region0']","['Employed full-time', 'Females', 'Region1']","['Employed part-time', 'Females', 'Region1']","['Employed full-time', 'Males', 'Region1']","['Employed part-time', 'Males', 'Region1']","['Employed full-time', 'Females', 'Region2']","['Employed part-time', 'Females', 'Region2']","['Employed full-time', 'Males', 'Region2']","['Employed part-time', 'Males', 'Region2']","['Employed full-time', 'Females', 'Region3']","['Employed part-time', 'Females', 'Region3']","['Employed full-time', 'Males', 'Region3']","['Employed part-time', 'Males', 'Region3']"
+['Total'],1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+['Region0'],1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0
+['Region1'],0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0
+['Region2'],0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0
+['Region3'],0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1
+"['Females', 'Region0']",1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"['Males', 'Region0']",0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0
+"['Females', 'Region1']",0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0
+"['Males', 'Region1']",0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0
+"['Females', 'Region2']",0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0
+"['Males', 'Region2']",0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0
+"['Females', 'Region3']",0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0
+"['Males', 'Region3']",0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1
+"['Employed full-time', 'Females', 'Region0']",1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"['Employed part-time', 'Females', 'Region0']",0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"['Employed full-time', 'Males', 'Region0']",0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0
+"['Employed part-time', 'Males', 'Region0']",0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0
+"['Employed full-time', 'Females', 'Region1']",0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0
+"['Employed part-time', 'Females', 'Region1']",0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+"['Employed full-time', 'Males', 'Region1']",0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
+"['Employed part-time', 'Males', 'Region1']",0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0
+"['Employed full-time', 'Females', 'Region2']",0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0
+"['Employed part-time', 'Females', 'Region2']",0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0
+"['Employed full-time', 'Males', 'Region2']",0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0
+"['Employed part-time', 'Males', 'Region2']",0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0
+"['Employed full-time', 'Females', 'Region3']",0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+"['Employed part-time', 'Females', 'Region3']",0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0
+"['Employed full-time', 'Males', 'Region3']",0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0
+"['Employed part-time', 'Males', 'Region3']",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1

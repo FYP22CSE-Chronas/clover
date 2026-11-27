@@ -38,6 +38,16 @@ def training_window_scale(
     return window_stats(insample, scaler).scale.mean(dim=0).squeeze(0).numpy()
 
 
+def training_ref_stats(windows: Sequence[Window]) -> tuple[torch.Tensor, torch.Tensor]:
+    """Pooled mean and std over TRAINING-window insamples only, each [1, 1, Nb]."""
+    insample = torch.as_tensor(
+        np.stack([w.insample for w in windows]), dtype=torch.float32
+    )
+    mu_ref = insample.mean(dim=(0, 1), keepdim=True)
+    sigma_ref = insample.std(dim=(0, 1), keepdim=True) + 1e-6
+    return mu_ref, sigma_ref
+
+
 def build_model(
     config: RunConfig,
     dataset: HierarchicalDataset,
@@ -85,6 +95,10 @@ def run(
             beta_init, training_window_scale(split.train, config.train.scaler)
         )
     model = build_model(config, dataset, features, ec_config, beta_init=beta_init)
+    if model.ec_branch is not None and hasattr(model.ec_branch, "mu_ref"):
+        mu_ref, sigma_ref = training_ref_stats(split.train)
+        model.ec_branch.mu_ref.copy_(mu_ref)
+        model.ec_branch.sigma_ref.copy_(sigma_ref)
     n_params = sum(p.numel() for p in model.parameters())
     if verbose:
         print(

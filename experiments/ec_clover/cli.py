@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 
 from config import available_datasets, load_config
-from experiments.ec_clover.config import load_ec_config
+from experiments.ec_clover.config import ECConfig, load_ec_config
 from experiments.ec_clover.run import run
 from pipeline.reporting import format_table, results_table, write_results
 
@@ -21,6 +21,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="path to a YAML file with an 'ec:' section (see experiments/ec_clover/"
         "configs/); omitted means the EC branch is disabled and this reproduces "
         "baseline CLOVER",
+    )
+    parser.add_argument(
+        "--preset",
+        choices=["none", "pi_hs_vp"],
+        default="none",
+        help="code preset: 'pi_hs_vp' enables Pi = -L L^T + HS-VP Factor Mixer + "
+        "energy objective without needing a YAML file",
     )
     parser.add_argument(
         "--beta-init",
@@ -48,8 +55,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Run every requested seed and write the aggregated results."""
     args = build_parser().parse_args(argv)
-    config = load_config(args.dataset, overrides=args.overrides)
-    ec_config = load_ec_config(args.ec_config)
+    if args.preset == "pi_hs_vp":
+        overrides = list(args.overrides)
+        if not any(o.startswith("train.objective=") for o in overrides):
+            overrides.insert(0, "train.objective=energy")
+        config = load_config(args.dataset, overrides=overrides)
+        ec_config = ECConfig.pi_hs_vp()
+    else:
+        config = load_config(args.dataset, overrides=args.overrides)
+        ec_config = load_ec_config(args.ec_config)
     beta_init = np.load(args.beta_init) if args.beta_init else None
 
     results = []
